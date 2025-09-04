@@ -1,0 +1,53 @@
+{
+  "name": "gitswitch",
+  "version": "1.0.0",
+  "description": "Git identity management tool - Global CLI",
+  "main": "index.js",
+  "bin": {
+    "gitswitch": "bin/gitswitch"
+  },
+  "scripts": {
+    "build": "npm run build:cli && npm run build:desktop",
+    "build:cli": "cd ../cli && npm run build",
+    "build:desktop": "cd ../desktop && npm run build",
+    "test": "echo \"Global package - integration tests would go here\" && exit 0",
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "dependencies": {
+    "@gitswitch/cli": "file:../cli",
+    "@gitswitch/core": "file:../core",
+    "@gitswitch/types": "file:../types"
+  },
+  "keywords": [
+    "git",
+    "identity",
+    "management",
+    "cli",
+    "desktop",
+    "electron",
+    "github",
+    "gitlab",
+    "account",
+    "switching"
+  ],
+  "author": "GitSwitch Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aman-dhakar-191/GitSwitch.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aman-dhakar-191/GitSwitch/issues"
+  },
+  "homepage": "https://github.com/aman-dhakar-191/GitSwitch#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "preferGlobal": true,
+  "files": [
+    "bin/",
+    "lib/",
+    "scripts/",
+    "README.md"
+  ]
+}

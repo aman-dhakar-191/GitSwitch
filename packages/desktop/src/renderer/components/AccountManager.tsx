@@ -32,6 +32,9 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   });
 
   const resetForm = () => {
+    console.log('🔄 resetForm called');
+    console.log('Resetting form data and hiding form');
+    
     setFormData({
       name: '',
       email: '',
@@ -40,11 +43,26 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     });
     setEditingAccount(null);
     setShowForm(false);
+    
+    console.log('✅ resetForm completed - showForm should now be false');
   };
 
   const handleAddAccount = () => {
+    console.log('🚀 Add Account button clicked!');
+    console.log('Current showForm state:', showForm);
+    console.log('About to set showForm to true and clear form for new account');
+    
+    // Clear form data for new account (but don't hide the form!)
+    setFormData({
+      name: '',
+      email: '',
+      gitName: '',
+      description: ''
+    });
+    setEditingAccount(null);
     setShowForm(true);
-    resetForm();
+    
+    console.log('✅ handleAddAccount completed - showForm should now be true');
   };
 
   const handleEditAccount = (account: GitAccount) => {
@@ -78,12 +96,19 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log('📝 Form submitted!');
+    console.log('Form data:', formData);
+    console.log('Editing account:', editingAccount);
+    
     e.preventDefault();
     
     if (!formData.name || !formData.email || !formData.gitName) {
+      console.log('❌ Validation failed - missing required fields');
       alert('Please fill in all required fields');
       return;
     }
+
+    console.log('✅ Form validation passed, proceeding with submission');
 
     try {
       if (editingAccount) {
@@ -117,36 +142,56 @@ const AccountManager: React.FC<AccountManagerProps> = ({
         }
       } else {
         // Add new account
+        console.log('🆕 Adding new account via IPC...');
+        
+        const accountData = {
+          name: formData.name,
+          email: formData.email,
+          gitName: formData.gitName,
+          description: formData.description || undefined,
+          // Stage 2 enhanced fields with defaults
+          patterns: [],
+          priority: 5,
+          color: '#3b82f6',
+          isDefault: false,
+          usageCount: 0,
+          lastUsed: new Date()
+        };
+        
+        console.log('Account data to send:', accountData);
+        
         const response = await window.electronAPI.invoke({
           type: 'ADD_ACCOUNT',
           payload: {
-            account: {
-              name: formData.name,
-              email: formData.email,
-              gitName: formData.gitName,
-              description: formData.description || undefined,
-              // Stage 2 enhanced fields with defaults
-              patterns: [],
-              priority: 5,
-              color: '#3b82f6',
-              isDefault: false,
-              usageCount: 0,
-              lastUsed: new Date()
-            }
+            account: accountData
           }
         });
         
+        console.log('IPC response received:', response);
+        
         if (response.success && response.data) {
+          console.log('✅ Account added successfully:', response.data);
           onAccountAdded(response.data);
           resetForm();
         } else {
+          console.log('❌ Failed to add account:', response.error);
           alert('Failed to add account: ' + (response.error || 'Unknown error'));
         }
       }
     } catch (error) {
+      console.error('❌ Error in handleSubmit:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       alert('Failed to save account: ' + error);
     }
   };
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('🔄 AccountManager render - showForm:', showForm, 'accounts:', accounts.length);
+  }, [showForm, accounts.length]);
 
   return (
     <div className="account-manager">

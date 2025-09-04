@@ -1,0 +1,4 @@
+# macOS Template Icon Placeholder
+# Template icons should be black and white with alpha channel
+# macOS will automatically apply proper styling for light/dark themes
+TRAY_ICON_TEMPLATE_PLACEHOLDER=true

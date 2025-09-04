@@ -1,0 +1,4 @@
+# Windows ICO Icon Placeholder
+# Windows tray icons should be in ICO format
+# Should include multiple sizes (16x16, 32x32)
+WINDOWS_TRAY_ICON_PLACEHOLDER=true

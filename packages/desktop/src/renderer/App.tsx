@@ -4,6 +4,8 @@ import ProjectView from './components/ProjectView';
 import AccountManager from './components/AccountManager';
 import Analytics from './components/Analytics';
 import HookManager from './components/HookManager';
+import TeamDashboard from './components/TeamDashboard';
+import SystemTrayControls from './components/SystemTrayControls';
 import './styles/App.css';
 
 // Extend the window interface to include our electron API
@@ -17,7 +19,7 @@ declare global {
   }
 }
 
-type View = 'project' | 'accounts' | 'analytics' | 'hooks' | 'settings';
+type View = 'project' | 'accounts' | 'analytics' | 'hooks' | 'teams' | 'tray' | 'settings';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('project');
@@ -55,12 +57,18 @@ const App: React.FC = () => {
         setProjects(projectsResponse.data || []);
       }
       
-      // Check if we have a project path from CLI
-      const urlParams = new URLSearchParams(window.location.search);
-      const projectPath = urlParams.get('project');
+      // Check for initial project from CLI
+      const initialProjectResponse = await window.electronAPI.invoke({
+        type: 'GET_INITIAL_PROJECT',
+        payload: null
+      });
       
-      if (projectPath) {
-        await loadProject(projectPath);
+      if (initialProjectResponse.success && initialProjectResponse.data) {
+        console.log('🎯 Loading initial project from CLI:', initialProjectResponse.data);
+        setCurrentProject(initialProjectResponse.data);
+        
+        // Load git config for the initial project
+        await loadProject(initialProjectResponse.data.path);
       }
       
     } catch (error) {
@@ -177,6 +185,18 @@ const App: React.FC = () => {
           >
             ⚙️ Hooks
           </button>
+          <button
+            className={`nav-button ${currentView === 'teams' ? 'active' : ''}`}
+            onClick={() => setCurrentView('teams')}
+          >
+            🏢 Teams
+          </button>
+          <button
+            className={`nav-button ${currentView === 'tray' ? 'active' : ''}`}
+            onClick={() => setCurrentView('tray')}
+          >
+            🖥️ Tray
+          </button>
         </nav>
       </header>
 
@@ -211,6 +231,14 @@ const App: React.FC = () => {
             projects={projects}
             currentProject={currentProject}
           />
+        )}
+        
+        {currentView === 'teams' && (
+          <TeamDashboard />
+        )}
+        
+        {currentView === 'tray' && (
+          <SystemTrayControls currentProject={currentProject} />
         )}
       </main>
     </div>

@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "test": "echo \"Types package - no tests needed\" && exit 0",
     "clean": "rimraf dist"
   },
   "devDependencies": {

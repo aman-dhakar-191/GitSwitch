@@ -1,0 +1,11 @@
+# GitSwitch Tray Icon Placeholder
+# In production, this would be a 16x16 or 32x32 PNG icon
+# For now, we'll use a simple text-based representation
+# The actual icon should be created using proper image editing tools
+
+# Icon should represent:
+# - Git branching/switching concept
+# - Simple and recognizable at small sizes
+# - Platform-appropriate styling (template image on macOS)
+
+TRAY_ICON_PLACEHOLDER=true
