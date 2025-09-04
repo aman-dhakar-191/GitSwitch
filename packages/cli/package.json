@@ -1,0 +1,28 @@
+{
+  "name": "@gitswitch/cli",
+  "version": "1.0.0",
+  "description": "GitSwitch command-line interface",
+  "main": "dist/index.js",
+  "bin": {
+    "gitswitch": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@gitswitch/types": "file:../types",
+    "@gitswitch/core": "file:../core",
+    "commander": "^11.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "rimraf": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "ts-jest": "^29.0.0"
+  }
+}
