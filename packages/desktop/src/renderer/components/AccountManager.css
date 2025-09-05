@@ -144,3 +144,128 @@
   padding-top: 16px;
   border-top: 1px solid var(--border);
 }
+
+/* OAuth Section Styles */
+.oauth-section {
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  background: rgba(45, 45, 45, 0.5);
+}
+
+.oauth-section h4 {
+  margin: 0 0 10px 0;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.oauth-description {
+  margin: 0 0 15px 0;
+  color: #bbbbbb;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.oauth-description strong {
+  color: #ffffff;
+}
+
+.oauth-providers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 600px) {
+  .oauth-providers {
+    grid-template-columns: 1fr;
+  }
+}
+
+.btn-oauth {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.btn-oauth:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn-oauth:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-github {
+  background: #24292e;
+  color: white;
+}
+
+.btn-github:hover:not(:disabled) {
+  background: #1a1e22;
+}
+
+.btn-gitlab {
+  background: #fc6d26;
+  color: white;
+}
+
+.btn-gitlab:hover:not(:disabled) {
+  background: #e85d1f;
+}
+
+.btn-bitbucket {
+  background: #0052cc;
+  color: white;
+}
+
+.btn-bitbucket:hover:not(:disabled) {
+  background: #004bb3;
+}
+
+.btn-azure {
+  background: #0078d4;
+  color: white;
+}
+
+.btn-azure:hover:not(:disabled) {
+  background: #106ebe;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  text-align: center;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #404040;
+}
+
+.divider span {
+  padding: 0 15px;
+  color: #888;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

@@ -19,6 +19,15 @@ export interface GitAccount {
   usageCount: number;    // Number of times used
   lastUsed: Date;        // Last usage timestamp
   
+  // OAuth integration fields
+  oauthProvider?: 'github' | 'gitlab' | 'bitbucket' | 'azure';
+  oauthToken?: string;        // Encrypted access token
+  oauthRefreshToken?: string; // Encrypted refresh token
+  oauthExpiry?: Date;         // Token expiration
+  avatarUrl?: string;         // User avatar from OAuth provider
+  profileUrl?: string;        // User profile URL
+  verified?: boolean;         // Email verification status
+  
   createdAt: Date;
   updatedAt: Date;
 }
@@ -307,7 +316,14 @@ export type IPCEvent =
   // System Tray Integration
   | { type: 'UPDATE_TRAY_MENU'; payload: { currentProject?: Project } }
   | { type: 'SHOW_TRAY_NOTIFICATION'; payload: { title: string; content: string; silent?: boolean } }
-  | { type: 'MINIMIZE_TO_TRAY'; payload: null };
+  | { type: 'MINIMIZE_TO_TRAY'; payload: null }
+  
+  // OAuth Authentication
+  | { type: 'GET_OAUTH_PROVIDERS'; payload: null }
+  | { type: 'START_OAUTH_FLOW'; payload: { provider: 'github' | 'gitlab' | 'bitbucket' | 'azure' } }
+  | { type: 'OAUTH_CALLBACK'; payload: { code: string; state: string; provider: string } }
+  | { type: 'REFRESH_OAUTH_TOKEN'; payload: { accountId: string } }
+  | { type: 'REVOKE_OAUTH_TOKEN'; payload: { accountId: string } };
 
 export type IPCResponse<T = any> = {
   success: boolean;

@@ -1,8 +1,15 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
-import { GitManager, StorageManager, ProjectManager, SmartDetector, GitHookManager, TeamManager, SecurityManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager, ProjectScanner } from '@gitswitch/core';
+import { GitManager, StorageManager, ProjectManager, SmartDetector, GitHookManager, TeamManager, SecurityManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager, ProjectScanner, OAuthManager } from '@gitswitch/core';
 import { IPCEvent, IPCResponse } from '@gitswitch/types';
 import { SystemTrayManager } from './SystemTrayManager';
+
+// Load environment variables from .env file if it exists
+try {
+  require('dotenv').config({ path: path.join(__dirname, '..', '..', '..', '..', '.env') });
+} catch (error) {
+  console.log('No .env file found, using default OAuth configuration');
+}
 
 class GitSwitchApp {
   private mainWindow: BrowserWindow | null = null;
@@ -18,6 +25,7 @@ class GitSwitchApp {
   private workflowAutomationManager: WorkflowAutomationManager;
   private bulkImportManager: BulkImportManager;
   private projectScanner: ProjectScanner;
+  private oauthManager: OAuthManager;
   private systemTrayManager: SystemTrayManager;
   private hasShownTrayNotification: boolean = false;
   private initialProjectPath: string | null = null;
@@ -35,6 +43,7 @@ class GitSwitchApp {
     this.workflowAutomationManager = new WorkflowAutomationManager(this.storageManager, this.gitManager, this.projectManager, this.securityManager, this.advancedGitManager);
     this.projectScanner = new ProjectScanner(this.gitManager, this.storageManager);
     this.bulkImportManager = new BulkImportManager(this.storageManager, this.projectScanner, this.smartDetector, this.gitManager);
+    this.oauthManager = new OAuthManager(this.storageManager);
     this.systemTrayManager = new SystemTrayManager(this.gitManager, this.storageManager, this.projectManager);
     
     // Parse command line arguments
@@ -893,6 +902,97 @@ class GitSwitchApp {
               return {
                 success: true,
                 data: scanResult
+              };
+            } catch (error: any) {
+              return {
+                success: false,
+                error: error.message
+              };
+            }
+
+          // OAuth Authentication IPC Handlers
+          case 'GET_OAUTH_PROVIDERS':
+            try {
+              const providers = this.oauthManager.getProviders();
+              return {
+                success: true,
+                data: providers
+              };
+            } catch (error: any) {
+              return {
+                success: false,
+                error: error.message
+              };
+            }
+
+          case 'START_OAUTH_FLOW':
+            try {
+              const account = await this.oauthManager.authenticateWithProvider(ipcEvent.payload.provider);
+              return {
+                success: true,
+                data: account
+              };
+            } catch (error: any) {
+              return {
+                success: false,
+                error: error.message
+              };
+            }
+
+          case 'OAUTH_CALLBACK':
+            try {
+              await this.oauthManager.handleOAuthCallback(
+                ipcEvent.payload.code,
+                ipcEvent.payload.state,
+                ipcEvent.payload.provider as any
+              );
+              return {
+                success: true,
+                data: 'OAuth callback handled successfully'
+              };
+            } catch (error: any) {
+              return {
+                success: false,
+                error: error.message
+              };
+            }
+
+          case 'REFRESH_OAUTH_TOKEN':
+            try {
+              const accounts = this.storageManager.getAccounts();
+              const account = accounts.find(a => a.id === ipcEvent.payload.accountId) as any;
+              if (!account || !account.oauthProvider) {
+                return {
+                  success: false,
+                  error: 'OAuth account not found'
+                };
+              }
+              const refreshedAccount = await this.oauthManager.refreshToken(account);
+              return {
+                success: true,
+                data: refreshedAccount
+              };
+            } catch (error: any) {
+              return {
+                success: false,
+                error: error.message
+              };
+            }
+
+          case 'REVOKE_OAUTH_TOKEN':
+            try {
+              const accounts = this.storageManager.getAccounts();
+              const account = accounts.find(a => a.id === ipcEvent.payload.accountId) as any;
+              if (!account || !account.oauthProvider) {
+                return {
+                  success: false,
+                  error: 'OAuth account not found'
+                };
+              }
+              await this.oauthManager.revokeToken(account);
+              return {
+                success: true,
+                data: 'Token revoked successfully'
               };
             } catch (error: any) {
               return {

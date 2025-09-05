@@ -24,6 +24,8 @@ const AccountManager: React.FC<AccountManagerProps> = ({
 }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<GitAccount | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const [deviceCodeInfo, setDeviceCodeInfo] = useState<{code: string, url: string} | null>(null);
   const [formData, setFormData] = useState<AccountFormData>({
     name: '',
     email: '',
@@ -63,6 +65,72 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     setShowForm(true);
     
     console.log('✅ handleAddAccount completed - showForm should now be true');
+  };
+
+  const handleOAuthLogin = async (provider: 'github' | 'gitlab' | 'bitbucket' | 'azure') => {
+    try {
+      console.log(`🔐 Starting ${provider} authentication...`);
+      setOauthLoading(provider);
+      
+      // Show different message for GitHub device flow
+      if (provider === 'github') {
+        // Show immediate feedback for device flow
+        const confirmDialog = window.confirm(
+          `GitHub Authentication Process:\n\n` +
+          `✨ We'll use GitHub's secure device flow:\n` +
+          `1. We'll show you a device code\n` +
+          `2. GitHub will open in your browser\n` +
+          `3. Enter the device code on GitHub\n` +
+          `4. Authorize GitSwitch\n\n` +
+          `Ready to start?`
+        );
+        
+        if (!confirmDialog) {
+          setOauthLoading(null);
+          return;
+        }
+      }
+      
+      const response = await window.electronAPI.invoke({
+        type: 'START_OAUTH_FLOW',
+        payload: { provider }
+      });
+      
+      if (response.success && response.data) {
+        console.log('✅ OAuth account added successfully:', response.data);
+        onAccountAdded(response.data);
+        setShowForm(false);
+        setDeviceCodeInfo(null);
+        
+        // Show success message with account details
+        const account = response.data;
+        alert(`✅ Successfully connected!\n\nAccount: ${account.name}\nEmail: ${account.email}\nProvider: ${provider.charAt(0).toUpperCase() + provider.slice(1)}`);
+      } else {
+        console.log('❌ OAuth authentication failed:', response.error);
+        const errorMsg = response.error || 'Unknown error';
+        
+        // Provide better error messages
+        let userFriendlyError = errorMsg;
+        if (errorMsg.includes('not configured')) {
+          userFriendlyError = `${provider.charAt(0).toUpperCase() + provider.slice(1)} OAuth is not configured. Please contact support or use manual account creation.`;
+        } else if (errorMsg.includes('timeout') || errorMsg.includes('timed out')) {
+          userFriendlyError = 'Authentication timed out. Please try again and make sure to complete the authorization on GitHub.';
+        } else if (errorMsg.includes('access_denied') || errorMsg.includes('cancelled')) {
+          userFriendlyError = 'You cancelled the authentication. Please try again if you want to connect your account.';
+        } else if (errorMsg.includes('authorization_pending')) {
+          userFriendlyError = 'Please complete the authorization on GitHub and try again.';
+        }
+        
+        alert('❌ Authentication failed: ' + userFriendlyError);
+        setDeviceCodeInfo(null);
+      }
+    } catch (error) {
+      console.error('❌ Error in OAuth flow:', error);
+      alert('Failed to authenticate: ' + error);
+      setDeviceCodeInfo(null);
+    } finally {
+      setOauthLoading(null);
+    }
   };
 
   const handleEditAccount = (account: GitAccount) => {
@@ -265,6 +333,69 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                 ✕
               </button>
             </div>
+            
+            {!editingAccount && (
+              <div className="oauth-section">
+                <h4>Connect your Git provider account</h4>
+                <p className="oauth-description">
+                  ✨ <strong>GitHub</strong>: One-click connection with secure device authentication (no setup needed)
+                </p>
+                <div className="oauth-providers">
+                  <button 
+                    type="button"
+                    className="btn btn-oauth btn-github"
+                    onClick={() => handleOAuthLogin('github')}
+                    disabled={oauthLoading !== null}
+                  >
+                    {oauthLoading === 'github' ? (
+                      <span>🔄 Connecting...</span>
+                    ) : (
+                      <span>🐙 Connect GitHub Account</span>
+                    )}
+                  </button>
+                  <button 
+                    type="button"
+                    className="btn btn-oauth btn-gitlab"
+                    onClick={() => handleOAuthLogin('gitlab')}
+                    disabled={oauthLoading !== null}
+                  >
+                    {oauthLoading === 'gitlab' ? (
+                      <span>🔄 Connecting...</span>
+                    ) : (
+                      <span>🦊 Sign in with GitLab</span>
+                    )}
+                  </button>
+                  <button 
+                    type="button"
+                    className="btn btn-oauth btn-bitbucket"
+                    onClick={() => handleOAuthLogin('bitbucket')}
+                    disabled={oauthLoading !== null}
+                  >
+                    {oauthLoading === 'bitbucket' ? (
+                      <span>🔄 Connecting...</span>
+                    ) : (
+                      <span>🪣 Sign in with Bitbucket</span>
+                    )}
+                  </button>
+                  <button 
+                    type="button"
+                    className="btn btn-oauth btn-azure"
+                    onClick={() => handleOAuthLogin('azure')}
+                    disabled={oauthLoading !== null}
+                  >
+                    {oauthLoading === 'azure' ? (
+                      <span>🔄 Connecting...</span>
+                    ) : (
+                      <span>🔷 Sign in with Azure DevOps</span>
+                    )}
+                  </button>
+                </div>
+                
+                <div className="divider">
+                  <span>or add manually</span>
+                </div>
+              </div>
+            )}
             
             <form onSubmit={handleSubmit}>
               <div className="form-group">

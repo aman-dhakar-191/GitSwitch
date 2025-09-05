@@ -16,6 +16,6 @@
     "noEmit": false,
     "jsx": "react-jsx"
   },
-  "include": ["src/renderer/**/*"],
+  "include": ["src/renderer/**/*", "src/renderer/types/**/*"],
   "exclude": ["node_modules", "src/main"]
 }

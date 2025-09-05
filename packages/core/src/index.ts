@@ -11,8 +11,9 @@ import { PluginManager } from './PluginManager';
 import { AdvancedGitManager } from './AdvancedGitManager';
 import { WorkflowAutomationManager } from './WorkflowAutomationManager';
 import { BulkImportManager } from './BulkImportManager';
+import { OAuthManager } from './OAuthManager';
 
-export { GitManager, StorageManager, ProjectManager, SmartDetector, ProjectScanner, GitHookManager, TeamManager, SecurityManager, ConfigSyncManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager };
+export { GitManager, StorageManager, ProjectManager, SmartDetector, ProjectScanner, GitHookManager, TeamManager, SecurityManager, ConfigSyncManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager, OAuthManager };
 
 export default {
   GitManager,
@@ -27,5 +28,6 @@ export default {
   PluginManager,
   AdvancedGitManager,
   WorkflowAutomationManager,
-  BulkImportManager
+  BulkImportManager,
+  OAuthManager
 };

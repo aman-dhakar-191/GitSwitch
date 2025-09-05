@@ -27,7 +27,8 @@
     "install-global": "cd packages/gitswitch && npm install -g .",
     "uninstall-global": "npm uninstall -g gitswitch",
     "verify": "node verify-packages.js",
-    "release": "node release.js"
+    "release": "node release.js",
+    "create-installer": "cd packages/desktop && npm run package-full"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
