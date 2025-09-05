@@ -1,6 +1,97 @@
 import React, { useState } from 'react';
 import { GitAccount } from '@gitswitch/types';
-import './AccountManager.css';
+
+// Material-UI imports
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardActions,
+  Typography,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Grid,
+  Chip,
+  Avatar,
+  Divider,
+  Fab,
+  Tooltip,
+  Switch,
+  FormControlLabel,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Alert,
+  AlertTitle,
+  alpha,
+  keyframes
+} from '@mui/material';
+import { styled } from '@mui/material/styles';
+
+// Icons
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CloseIcon from '@mui/icons-material/Close';
+import GitHubIcon from '@mui/icons-material/GitHub';
+import StorageIcon from '@mui/icons-material/Storage';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import CloudIcon from '@mui/icons-material/Cloud';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import EmailIcon from '@mui/icons-material/Email';
+import PersonIcon from '@mui/icons-material/Person';
+import DescriptionIcon from '@mui/icons-material/Description';
+import SecurityIcon from '@mui/icons-material/Security';
+import StarIcon from '@mui/icons-material/Star';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+
+const float = keyframes`
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+`;
+
+const StyledCard = styled(Card)(({ theme }) => ({
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  borderRadius: 20,
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+  background: 'linear-gradient(145deg, #1e1e1e, #252525)',
+  border: '1px solid rgba(255, 255, 255, 0.05)',
+  '&:hover': {
+    transform: 'translateY(-6px)',
+    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+  },
+}));
+
+const StyledFab = styled(Fab)(({ theme }) => ({
+  position: 'fixed',
+  bottom: theme.spacing(5),
+  right: theme.spacing(5),
+  boxShadow: '0 8px 20px rgba(0, 0, 0, 0.3)',
+  background: 'linear-gradient(135deg, #007acc 0%, #3399dd 100%)',
+  '&:hover': {
+    boxShadow: '0 12px 25px rgba(0, 0, 0, 0.4)',
+    background: 'linear-gradient(135deg, #005a9e 0%, #007acc 100%)',
+    transform: 'translateY(-3px)',
+  },
+  animation: `${float} 3s ease-in-out infinite`,
+}));
 
 interface AccountManagerProps {
   accounts: GitAccount[];
@@ -14,6 +105,9 @@ interface AccountFormData {
   email: string;
   gitName: string;
   description: string;
+  isDefault: boolean;
+  priority: number;
+  color: string;
 }
 
 const AccountManager: React.FC<AccountManagerProps> = ({
@@ -30,51 +124,46 @@ const AccountManager: React.FC<AccountManagerProps> = ({
     name: '',
     email: '',
     gitName: '',
-    description: ''
+    description: '',
+    isDefault: false,
+    priority: 5,
+    color: '#007acc'
   });
 
   const resetForm = () => {
-    console.log('🔄 resetForm called');
-    console.log('Resetting form data and hiding form');
-    
     setFormData({
       name: '',
       email: '',
       gitName: '',
-      description: ''
+      description: '',
+      isDefault: false,
+      priority: 5,
+      color: '#007acc'
     });
     setEditingAccount(null);
     setShowForm(false);
-    
-    console.log('✅ resetForm completed - showForm should now be false');
   };
 
   const handleAddAccount = () => {
-    console.log('🚀 Add Account button clicked!');
-    console.log('Current showForm state:', showForm);
-    console.log('About to set showForm to true and clear form for new account');
-    
-    // Clear form data for new account (but don't hide the form!)
     setFormData({
       name: '',
       email: '',
       gitName: '',
-      description: ''
+      description: '',
+      isDefault: false,
+      priority: 5,
+      color: '#007acc'
     });
     setEditingAccount(null);
     setShowForm(true);
-    
-    console.log('✅ handleAddAccount completed - showForm should now be true');
   };
 
   const handleOAuthLogin = async (provider: 'github' | 'gitlab' | 'bitbucket' | 'azure') => {
     try {
-      console.log(`🔐 Starting ${provider} authentication...`);
       setOauthLoading(provider);
       
       // Show different message for GitHub device flow
       if (provider === 'github') {
-        // Show immediate feedback for device flow
         const confirmDialog = window.confirm(
           `GitHub Authentication Process:\n\n` +
           `✨ We'll use GitHub's secure device flow:\n` +
@@ -97,19 +186,15 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       });
       
       if (response.success && response.data) {
-        console.log('✅ OAuth account added successfully:', response.data);
         onAccountAdded(response.data);
         setShowForm(false);
         setDeviceCodeInfo(null);
         
-        // Show success message with account details
         const account = response.data;
         alert(`✅ Successfully connected!\n\nAccount: ${account.name}\nEmail: ${account.email}\nProvider: ${provider.charAt(0).toUpperCase() + provider.slice(1)}`);
       } else {
-        console.log('❌ OAuth authentication failed:', response.error);
         const errorMsg = response.error || 'Unknown error';
         
-        // Provide better error messages
         let userFriendlyError = errorMsg;
         if (errorMsg.includes('not configured')) {
           userFriendlyError = `${provider.charAt(0).toUpperCase() + provider.slice(1)} OAuth is not configured. Please contact support or use manual account creation.`;
@@ -125,7 +210,6 @@ const AccountManager: React.FC<AccountManagerProps> = ({
         setDeviceCodeInfo(null);
       }
     } catch (error) {
-      console.error('❌ Error in OAuth flow:', error);
       alert('Failed to authenticate: ' + error);
       setDeviceCodeInfo(null);
     } finally {
@@ -138,7 +222,10 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       name: account.name,
       email: account.email,
       gitName: account.gitName,
-      description: account.description || ''
+      description: account.description || '',
+      isDefault: account.isDefault,
+      priority: account.priority || 5,
+      color: account.color || '#007acc'
     });
     setEditingAccount(account);
     setShowForm(true);
@@ -164,23 +251,15 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log('📝 Form submitted!');
-    console.log('Form data:', formData);
-    console.log('Editing account:', editingAccount);
-    
     e.preventDefault();
     
     if (!formData.name || !formData.email || !formData.gitName) {
-      console.log('❌ Validation failed - missing required fields');
       alert('Please fill in all required fields');
       return;
     }
 
-    console.log('✅ Form validation passed, proceeding with submission');
-
     try {
       if (editingAccount) {
-        // Update existing account
         const response = await window.electronAPI.invoke({
           type: 'UPDATE_ACCOUNT',
           payload: {
@@ -189,7 +268,10 @@ const AccountManager: React.FC<AccountManagerProps> = ({
               name: formData.name,
               email: formData.email,
               gitName: formData.gitName,
-              description: formData.description || undefined
+              description: formData.description || undefined,
+              isDefault: formData.isDefault,
+              priority: formData.priority,
+              color: formData.color
             }
           }
         });
@@ -201,6 +283,9 @@ const AccountManager: React.FC<AccountManagerProps> = ({
             email: formData.email,
             gitName: formData.gitName,
             description: formData.description || undefined,
+            isDefault: formData.isDefault,
+            priority: formData.priority,
+            color: formData.color,
             updatedAt: new Date()
           };
           onAccountUpdated(updatedAccount);
@@ -209,24 +294,18 @@ const AccountManager: React.FC<AccountManagerProps> = ({
           alert('Failed to update account: ' + (response.error || 'Unknown error'));
         }
       } else {
-        // Add new account
-        console.log('🆕 Adding new account via IPC...');
-        
         const accountData = {
           name: formData.name,
           email: formData.email,
           gitName: formData.gitName,
           description: formData.description || undefined,
-          // Stage 2 enhanced fields with defaults
+          isDefault: formData.isDefault,
+          priority: formData.priority,
+          color: formData.color,
           patterns: [],
-          priority: 5,
-          color: '#3b82f6',
-          isDefault: false,
           usageCount: 0,
           lastUsed: new Date()
         };
-        
-        console.log('Account data to send:', accountData);
         
         const response = await window.electronAPI.invoke({
           type: 'ADD_ACCOUNT',
@@ -235,247 +314,547 @@ const AccountManager: React.FC<AccountManagerProps> = ({
           }
         });
         
-        console.log('IPC response received:', response);
-        
         if (response.success && response.data) {
-          console.log('✅ Account added successfully:', response.data);
           onAccountAdded(response.data);
           resetForm();
         } else {
-          console.log('❌ Failed to add account:', response.error);
           alert('Failed to add account: ' + (response.error || 'Unknown error'));
         }
       }
     } catch (error) {
-      console.error('❌ Error in handleSubmit:', error);
-      console.error('Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
       alert('Failed to save account: ' + error);
     }
   };
 
-  // Debug logging
-  React.useEffect(() => {
-    console.log('🔄 AccountManager render - showForm:', showForm, 'accounts:', accounts.length);
-  }, [showForm, accounts.length]);
-
   return (
-    <div className="account-manager">
-      <div className="account-header">
-        <h2>Manage Git Accounts</h2>
-        <button 
-          className="btn btn-primary"
-          onClick={handleAddAccount}
-        >
-          + Add Account
-        </button>
-      </div>
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Box>
+          <Typography 
+            variant="h1" 
+            sx={{ 
+              fontWeight: 800, 
+              mb: 1,
+              background: 'linear-gradient(90deg, #007acc, #3399dd)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}
+          >
+            Account Manager
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Manage your Git accounts and credentials
+          </Typography>
+        </Box>
+        <Tooltip title="Add Account">
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />}
+            onClick={handleAddAccount}
+            sx={{ 
+              borderRadius: 12, 
+              px: 4, 
+              py: 1.5,
+              background: 'linear-gradient(90deg, #007acc, #3399dd)',
+              boxShadow: '0 4px 12px rgba(0, 122, 204, 0.3)',
+              '&:hover': {
+                background: 'linear-gradient(90deg, #005a9e, #007acc)',
+                boxShadow: '0 6px 16px rgba(0, 122, 204, 0.4)',
+                transform: 'translateY(-2px)',
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Add Account
+          </Button>
+        </Tooltip>
+      </Box>
 
       {accounts.length === 0 ? (
-        <div className="no-accounts">
-          <p>No accounts configured yet.</p>
-          <p>Add your first git account to get started.</p>
-        </div>
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <Box sx={{ 
+            width: 120, 
+            height: 120, 
+            borderRadius: '50%', 
+            bgcolor: alpha('#007acc', 0.1),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 24px',
+            animation: `${float} 4s ease-in-out infinite`
+          }}>
+            <SecurityIcon sx={{ fontSize: 60, color: '#007acc' }} />
+          </Box>
+          <Typography variant="h2" sx={{ mb: 2, fontWeight: 700 }}>No accounts configured</Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 500, mx: 'auto' }}>
+            Get started by adding your first Git account. You can connect via OAuth or add accounts manually.
+          </Typography>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />}
+            onClick={handleAddAccount}
+            size="large"
+            sx={{ 
+              borderRadius: 12, 
+              px: 5, 
+              py: 2,
+              background: 'linear-gradient(90deg, #007acc, #3399dd)',
+              boxShadow: '0 6px 16px rgba(0, 122, 204, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(90deg, #005a9e, #007acc)',
+                boxShadow: '0 8px 20px rgba(0, 122, 204, 0.6)',
+                transform: 'translateY(-3px)',
+              },
+              transition: 'all 0.3s ease',
+              fontWeight: 700,
+              fontSize: '1.1rem'
+            }}
+          >
+            Add Your First Account
+          </Button>
+        </Box>
       ) : (
-        <div className="account-list">
-          {accounts.map(account => (
-            <div key={account.id} className="account-card card">
-              <div className="account-info">
-                <h3>{account.name}</h3>
-                <div className="account-details">
-                  <div className="detail-item">
-                    <span className="label">Email:</span>
-                    <span className="value">{account.email}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="label">Git Name:</span>
-                    <span className="value">{account.gitName}</span>
-                  </div>
-                  {account.description && (
-                    <div className="detail-item">
-                      <span className="label">Description:</span>
-                      <span className="value">{account.description}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="account-actions">
-                <button 
-                  className="btn btn-secondary btn-small"
-                  onClick={() => handleEditAccount(account)}
-                >
-                  Edit
-                </button>
-                <button 
-                  className="btn btn-error btn-small"
-                  onClick={() => handleDeleteAccount(account.id)}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <>
+          <Alert 
+            severity="info" 
+            sx={{ 
+              mb: 4, 
+              borderRadius: 3,
+              background: 'linear-gradient(145deg, #1e1e1e, #252525)',
+              border: '1px solid rgba(255, 255, 255, 0.05)'
+            }}
+            icon={<TrendingUpIcon />}
+          >
+            <AlertTitle sx={{ fontWeight: 700 }}>Account Management</AlertTitle>
+            You have {accounts.length} account{accounts.length !== 1 ? 's' : ''} configured. 
+            {accounts.filter(acc => acc.isDefault).length} account{accounts.filter(acc => acc.isDefault).length !== 1 ? 's are' : ' is'} currently set as default.
+          </Alert>
+          
+          <Grid container spacing={3}>
+            {accounts.map(account => (
+              <Grid item xs={12} sm={6} md={4} key={account.id}>
+                <StyledCard>
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Avatar 
+                          sx={{ 
+                            bgcolor: account.color || '#007acc', 
+                            mr: 2,
+                            width: 64,
+                            height: 64,
+                            fontSize: '1.5rem',
+                            fontWeight: 700,
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+                          }}
+                        >
+                          {account.name.charAt(0)}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h3" component="h3" sx={{ fontWeight: 700 }}>
+                            {account.name}
+                          </Typography>
+                          {account.isDefault && (
+                            <Chip 
+                              icon={<StarIcon />}
+                              label="Default" 
+                              size="small" 
+                              color="primary" 
+                              variant="outlined" 
+                              sx={{ mt: 0.5, fontWeight: 700 }}
+                            />
+                          )}
+                        </Box>
+                      </Box>
+                      <Chip 
+                        label={account.isDefault ? 'Default' : 'Active'} 
+                        size="small" 
+                        color={account.isDefault ? 'primary' : 'success'} 
+                        variant="outlined" 
+                        sx={{ fontWeight: 700 }}
+                      />
+                    </Box>
+                    
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                        <EmailIcon sx={{ mr: 1, fontSize: '1rem' }} /> {account.email}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                        <PersonIcon sx={{ mr: 1, fontSize: '1rem' }} /> {account.gitName}
+                      </Typography>
+                      {account.description && (
+                        <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                          <DescriptionIcon sx={{ mr: 1, fontSize: '1rem' }} /> {account.description}
+                        </Typography>
+                      )}
+                    </Box>
+                    
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      <Chip 
+                        label={`Usage: ${account.usageCount || 0}`} 
+                        size="small" 
+                        variant="outlined" 
+                        sx={{ fontWeight: 600 }}
+                      />
+                      <Chip 
+                        label={`Priority: ${account.priority || 5}`} 
+                        size="small" 
+                        variant="outlined" 
+                        sx={{ fontWeight: 600 }}
+                      />
+                      {account.lastUsed && (
+                        <Chip 
+                          label={`Last used: ${new Date(account.lastUsed).toLocaleDateString()}`} 
+                          size="small" 
+                          variant="outlined" 
+                          sx={{ fontWeight: 600 }}
+                        />
+                      )}
+                    </Box>
+                  </CardContent>
+                  
+                  <CardActions sx={{ justifyContent: 'flex-end', p: 2, pt: 0 }}>
+                    <Button 
+                      size="small" 
+                      startIcon={<EditIcon />}
+                      onClick={() => handleEditAccount(account)}
+                      sx={{ 
+                        borderRadius: 6,
+                        fontWeight: 600,
+                        '&:hover': {
+                          backgroundColor: alpha('#007acc', 0.1)
+                        }
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button 
+                      size="small" 
+                      startIcon={<DeleteIcon />}
+                      onClick={() => handleDeleteAccount(account.id)}
+                      color="error"
+                      sx={{ 
+                        borderRadius: 6,
+                        fontWeight: 600,
+                        '&:hover': {
+                          backgroundColor: alpha('#f44336', 0.1)
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </CardActions>
+                </StyledCard>
+              </Grid>
+            ))}
+          </Grid>
+        </>
       )}
 
-      {showForm && (
-        <div className="form-overlay">
-          <div className="form-modal">
-            <div className="form-header">
-              <h3>{editingAccount ? 'Edit Account' : 'Add New Account'}</h3>
-              <button 
-                className="close-button"
-                onClick={resetForm}
+      <StyledFab 
+        color="primary" 
+        onClick={handleAddAccount}
+        aria-label="add account"
+      >
+        <AddIcon />
+      </StyledFab>
+
+      <Dialog 
+        open={showForm} 
+        onClose={resetForm}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            boxShadow: '0 15px 50px rgba(0, 0, 0, 0.4)',
+            background: 'linear-gradient(145deg, #1e1e1e, #252525)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h2" sx={{ fontWeight: 700 }}>
+              {editingAccount ? 'Edit Account' : 'Add New Account'}
+            </Typography>
+            <IconButton onClick={resetForm}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers sx={{ pt: 1 }}>
+          {!editingAccount && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h3" sx={{ mb: 2, fontWeight: 600 }}>Connect your Git provider account</Typography>
+              <Alert 
+                severity="info" 
+                sx={{ 
+                  mb: 3, 
+                  borderRadius: 2,
+                  background: 'rgba(33, 150, 243, 0.1)',
+                  border: '1px solid rgba(33, 150, 243, 0.2)'
+                }}
               >
-                ✕
-              </button>
-            </div>
-            
-            {!editingAccount && (
-              <div className="oauth-section">
-                <h4>Connect your Git provider account</h4>
-                <p className="oauth-description">
-                  ✨ <strong>GitHub</strong>: One-click connection with secure device authentication (no setup needed)
-                </p>
-                <div className="oauth-providers">
-                  <button 
-                    type="button"
-                    className="btn btn-oauth btn-github"
+                <AlertTitle>OAuth Connection</AlertTitle>
+                Connect your account securely with one-click authentication. No passwords required.
+              </Alert>
+              
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={6}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    startIcon={<GitHubIcon />}
                     onClick={() => handleOAuthLogin('github')}
                     disabled={oauthLoading !== null}
+                    sx={{ 
+                      bgcolor: '#24292e',
+                      textTransform: 'none',
+                      py: 1.5,
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      boxShadow: '0 4px 12px rgba(36, 41, 46, 0.3)',
+                      '&:hover': {
+                        bgcolor: '#1a1e22',
+                        boxShadow: '0 6px 16px rgba(36, 41, 46, 0.4)',
+                        transform: 'translateY(-2px)',
+                      },
+                      transition: 'all 0.3s ease'
+                    }}
                   >
-                    {oauthLoading === 'github' ? (
-                      <span>🔄 Connecting...</span>
-                    ) : (
-                      <span>🐙 Connect GitHub Account</span>
-                    )}
-                  </button>
-                  <button 
-                    type="button"
-                    className="btn btn-oauth btn-gitlab"
+                    {oauthLoading === 'github' ? 'Connecting...' : 'Connect GitHub'}
+                  </Button>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    startIcon={<StorageIcon />}
                     onClick={() => handleOAuthLogin('gitlab')}
                     disabled={oauthLoading !== null}
+                    sx={{ 
+                      bgcolor: '#fc6d26',
+                      textTransform: 'none',
+                      py: 1.5,
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      boxShadow: '0 4px 12px rgba(252, 109, 38, 0.3)',
+                      '&:hover': {
+                        bgcolor: '#e85d1f',
+                        boxShadow: '0 6px 16px rgba(252, 109, 38, 0.4)',
+                        transform: 'translateY(-2px)',
+                      },
+                      transition: 'all 0.3s ease'
+                    }}
                   >
-                    {oauthLoading === 'gitlab' ? (
-                      <span>🔄 Connecting...</span>
-                    ) : (
-                      <span>🦊 Sign in with GitLab</span>
-                    )}
-                  </button>
-                  <button 
-                    type="button"
-                    className="btn btn-oauth btn-bitbucket"
+                    {oauthLoading === 'gitlab' ? 'Connecting...' : 'GitLab'}
+                  </Button>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    startIcon={<AccountTreeIcon />}
                     onClick={() => handleOAuthLogin('bitbucket')}
                     disabled={oauthLoading !== null}
+                    sx={{ 
+                      bgcolor: '#0052cc',
+                      textTransform: 'none',
+                      py: 1.5,
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      boxShadow: '0 4px 12px rgba(0, 82, 204, 0.3)',
+                      '&:hover': {
+                        bgcolor: '#004bb3',
+                        boxShadow: '0 6px 16px rgba(0, 82, 204, 0.4)',
+                        transform: 'translateY(-2px)',
+                      },
+                      transition: 'all 0.3s ease'
+                    }}
                   >
-                    {oauthLoading === 'bitbucket' ? (
-                      <span>🔄 Connecting...</span>
-                    ) : (
-                      <span>🪣 Sign in with Bitbucket</span>
-                    )}
-                  </button>
-                  <button 
-                    type="button"
-                    className="btn btn-oauth btn-azure"
+                    {oauthLoading === 'bitbucket' ? 'Connecting...' : 'Bitbucket'}
+                  </Button>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    startIcon={<CloudIcon />}
                     onClick={() => handleOAuthLogin('azure')}
                     disabled={oauthLoading !== null}
+                    sx={{ 
+                      bgcolor: '#0078d4',
+                      textTransform: 'none',
+                      py: 1.5,
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      boxShadow: '0 4px 12px rgba(0, 120, 212, 0.3)',
+                      '&:hover': {
+                        bgcolor: '#106ebe',
+                        boxShadow: '0 6px 16px rgba(0, 120, 212, 0.4)',
+                        transform: 'translateY(-2px)',
+                      },
+                      transition: 'all 0.3s ease'
+                    }}
                   >
-                    {oauthLoading === 'azure' ? (
-                      <span>🔄 Connecting...</span>
-                    ) : (
-                      <span>🔷 Sign in with Azure DevOps</span>
-                    )}
-                  </button>
-                </div>
-                
-                <div className="divider">
-                  <span>or add manually</span>
-                </div>
-              </div>
-            )}
-            
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label className="form-label">
-                  Display Name *
-                </label>
-                <input
-                  type="text"
-                  className="form-input"
+                    {oauthLoading === 'azure' ? 'Connecting...' : 'Azure DevOps'}
+                  </Button>
+                </Grid>
+              </Grid>
+              
+              <Divider sx={{ my: 3 }}>
+                <Chip label="OR" size="small" variant="outlined" />
+              </Divider>
+            </Box>
+          )}
+          
+          <form onSubmit={handleSubmit}>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Display Name *"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   placeholder="e.g., John Developer"
                   required
+                  variant="outlined"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    }
+                  }}
                 />
-              </div>
+              </Grid>
               
-              <div className="form-group">
-                <label className="form-label">
-                  Email Address *
-                </label>
-                <input
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Email Address *"
                   type="email"
-                  className="form-input"
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   placeholder="e.g., john@company.com"
                   required
+                  variant="outlined"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    }
+                  }}
                 />
-              </div>
+              </Grid>
               
-              <div className="form-group">
-                <label className="form-label">
-                  Git Name *
-                </label>
-                <input
-                  type="text"
-                  className="form-input"
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Git Name *"
                   value={formData.gitName}
                   onChange={(e) => setFormData({...formData, gitName: e.target.value})}
                   placeholder="e.g., John Developer"
                   required
+                  variant="outlined"
+                  helperText="This will be used as git user.name"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    }
+                  }}
                 />
-                <small className="form-help">
-                  This will be used as git user.name
-                </small>
-              </div>
+              </Grid>
               
-              <div className="form-group">
-                <label className="form-label">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  className="form-input"
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Description"
                   value={formData.description}
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
                   placeholder="e.g., Work Account, Personal"
+                  variant="outlined"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    }
+                  }}
                 />
-              </div>
+              </Grid>
               
-              <div className="form-actions">
-                <button 
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={resetForm}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  className="btn btn-primary"
-                >
-                  {editingAccount ? 'Update Account' : 'Add Account'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth variant="outlined">
+                  <InputLabel>Priority</InputLabel>
+                  <Select
+                    value={formData.priority}
+                    label="Priority"
+                    onChange={(e) => setFormData({...formData, priority: Number(e.target.value)})}
+                    sx={{
+                      borderRadius: 2,
+                    }}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                      <MenuItem key={num} value={num}>Level {num}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={formData.isDefault}
+                        onChange={(e) => setFormData({...formData, isDefault: e.target.checked})}
+                        color="primary"
+                      />
+                    }
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <StarIcon sx={{ mr: 1, fontSize: '1rem' }} />
+                        <span>Default Account</span>
+                      </Box>
+                    }
+                  />
+                </Box>
+              </Grid>
+            </Grid>
+          </form>
+        </DialogContent>
+        
+        <DialogActions sx={{ p: 2 }}>
+          <Button 
+            onClick={resetForm} 
+            color="secondary" 
+            sx={{ 
+              borderRadius: 6,
+              fontWeight: 600
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit as any}
+            variant="contained"
+            color="primary"
+            sx={{ 
+              borderRadius: 6, 
+              px: 3,
+              background: 'linear-gradient(90deg, #007acc, #3399dd)',
+              boxShadow: '0 4px 12px rgba(0, 122, 204, 0.3)',
+              '&:hover': {
+                background: 'linear-gradient(90deg, #005a9e, #007acc)',
+                boxShadow: '0 6px 16px rgba(0, 122, 204, 0.4)',
+              },
+              transition: 'all 0.3s ease',
+              fontWeight: 600
+            }}
+          >
+            {editingAccount ? 'Update Account' : 'Add Account'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 

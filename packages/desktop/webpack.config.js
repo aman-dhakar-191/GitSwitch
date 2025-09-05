@@ -21,6 +21,10 @@ module.exports = {
         test: /\.css$/,
         use: ['style-loader', 'css-loader'],
       },
+      {
+        test: /\.(png|jpe?g|gif|svg|webp)$/i,
+        type: 'asset/resource',
+      },
     ],
   },
   resolve: {
@@ -57,5 +61,7 @@ module.exports = {
       directory: path.join(__dirname, 'dist'),
     },
     port: 3000,
+    hot: true,
+    open: true,
   },
 };
