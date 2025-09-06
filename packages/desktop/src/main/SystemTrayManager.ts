@@ -29,6 +29,8 @@ export class SystemTrayManager {
    */
   initialize(mainWindow: BrowserWindow): void {
     this.mainWindow = mainWindow;
+    console.log('[SystemTrayManager] dirname: ',__dirname);
+    
     this.createTray();
     this.setupTrayEvents();
   }
@@ -71,6 +73,8 @@ export class SystemTrayManager {
 
   private createTray(): void {
     const iconPath = this.getTrayIconPath();
+    console.log('icons path:', iconPath,);
+    
     const icon = nativeImage.createFromPath(iconPath);
     
     // Resize icon for proper tray display
@@ -231,6 +235,12 @@ export class SystemTrayManager {
         type: 'normal',
         click: () => this.reportIssue()
       },
+      {
+        label: '💡 Suggest a Feature',
+        icon: nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'icons', 'feature-icon.png')),
+        type: 'normal',
+        click: () => this.reportIssue()
+      },
       { type: 'separator' },
       {
         label: '❌ Quit GitSwitch',
@@ -253,16 +263,20 @@ export class SystemTrayManager {
     const isDev = process.env.NODE_ENV === 'development';
     const iconName = process.platform === 'win32' ? 'tray-icon.ico' : 
                      process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon.png';
+    console.log('iconName:', iconName);
     
     if (isDev) {
-      return path.join(__dirname, '..', '..', 'assets', 'icons', iconName);
+      return path.join(__dirname, '..', 'assets', 'icons', iconName);
+      // return path.join(__dirname, '..', 'assets', 'icons', iconName);
     } else {
-      return path.join(process.resourcesPath, 'assets', 'icons', iconName);
+      return path.join(__dirname, '..', 'assets', 'icons', iconName);
+      // return path.join(process.resourcesPath, 'assets', 'icons', iconName);
     }
   }
 
   private getTrayIcon(): Electron.NativeImage {
     const iconPath = this.getTrayIconPath();
+    console.log("Tray Icon Path:", iconPath);
     return nativeImage.createFromPath(iconPath);
   }
 

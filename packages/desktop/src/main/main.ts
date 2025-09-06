@@ -69,6 +69,7 @@ class GitSwitchApp {
       this.createMainWindow();
 
       app.on('activate', () => {
+        console.log('whenReady Activate');
         if (BrowserWindow.getAllWindows().length === 0) {
           this.createMainWindow();
         }
@@ -76,6 +77,7 @@ class GitSwitchApp {
     });
 
     app.on('window-all-closed', () => {
+      console.log('Quit');
       // On macOS, keep app running even when all windows are closed
       // On other platforms, quit unless specifically keeping in tray
       if (process.platform !== 'darwin') {
@@ -85,10 +87,12 @@ class GitSwitchApp {
     });
 
     app.on('before-quit', () => {
+      console.log('Before Quit');
       (app as any).isQuiting = true;
     });
 
     app.on('activate', () => {
+      console.log('Activate');
       // On macOS, re-create window when dock icon is clicked
       if (BrowserWindow.getAllWindows().length === 0) {
         this.createMainWindow();
@@ -99,6 +103,8 @@ class GitSwitchApp {
   }
 
   private createMainWindow(): void {
+    console.log('🚀 Initializing GitSwitch...');
+    console.log('[GitSwitchApp] dirname: ',__dirname);
     this.mainWindow = new BrowserWindow({
       width: 800,
       height: 600,
@@ -111,7 +117,7 @@ class GitSwitchApp {
       },
       titleBarStyle: 'default',
       show: false, // Don't show until ready
-      icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'tray-icon.png')
+      icon: path.join(__dirname, '..', 'assets', 'icons', 'tray-icon.png')
     });
 
     // Load the React app
