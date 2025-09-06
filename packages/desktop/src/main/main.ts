@@ -105,6 +105,8 @@ class GitSwitchApp {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        experimentalFeatures: true,
+        enableBlinkFeatures: 'CSSBackdropFilter',
         preload: path.join(__dirname, 'preload.js'),
       },
       titleBarStyle: 'default',

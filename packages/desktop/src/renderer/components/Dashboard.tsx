@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Grid, 
@@ -25,425 +25,541 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
 
-const pulse = keyframes`
-  0% {
-    transform: scale(1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-  50% {
-    transform: scale(1.02);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
+// Import your types
+import { GitAccount, Project } from '@gitswitch/types';
+
+// Optimized keyframes - reduced complexity
+const subtleFloat = keyframes`
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
 `;
 
+const shimmer = keyframes`
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+`;
+
+// Simplified background - no expensive blur effects
+const BackgroundContainer = styled(Box)({
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  width: '100vw',
+  height: '100vh',
+  background: `
+    radial-gradient(circle at 20% 80%, rgba(0, 122, 204, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(51, 153, 221, 0.08) 0%, transparent 50%),
+    linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)
+  `,
+  zIndex: -1,
+});
+
+// Optimized glass styles - reduced blur intensity
+const glassBaseStyles = {
+  background: 'rgba(255, 255, 255, 0.05)',
+  backdropFilter: 'blur(8px)', // Reduced from 20px
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)', // Simplified shadow
+};
+
+// Performance-optimized StatCard
 const StatCard = styled(Card)(({ theme }) => ({
-  borderRadius: 20,
-  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+  ...glassBaseStyles,
+  borderRadius: 20, // Reduced from 24
   height: '100%',
-  background: 'linear-gradient(145deg, #1e1e1e, #252525)',
-  border: '1px solid rgba(255, 255, 255, 0.05)',
-  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
   position: 'relative',
   overflow: 'hidden',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', // Faster transition
+  willChange: 'transform', // GPU optimization hint
   '&:hover': {
-    transform: 'translateY(-6px)',
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-    '&::before': {
-      opacity: 0.15,
-    },
+    transform: 'translateY(-4px)', // Reduced movement
+    background: 'rgba(255, 255, 255, 0.08)',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
   },
-  '&::before': {
-    content: '""',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 4,
-    background: 'linear-gradient(90deg, #007acc, #3399dd)',
-    opacity: 0,
-    transition: 'opacity 0.3s ease',
-  },
+  // Removed expensive pseudo-elements
 }));
 
+// Optimized Quick Action Card
 const QuickActionCard = styled(Card)(({ theme }) => ({
+  ...glassBaseStyles,
   borderRadius: 20,
-  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
   height: '100%',
   display: 'flex',
   flexDirection: 'column',
   justifyContent: 'center',
   alignItems: 'center',
   textAlign: 'center',
-  padding: theme.spacing(4),
-  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-  background: 'linear-gradient(145deg, #1e1e1e, #252525)',
-  border: '1px solid rgba(255, 255, 255, 0.05)',
+  padding: theme.spacing(3),
   cursor: 'pointer',
+  position: 'relative',
+  overflow: 'hidden',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  willChange: 'transform',
   '&:hover': {
-    transform: 'translateY(-6px)',
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-    backgroundColor: 'rgba(0, 122, 204, 0.1)',
+    transform: 'translateY(-6px)', // Reduced movement
+    background: 'rgba(0, 122, 204, 0.1)',
+    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)',
   },
+  // Removed expensive hover effects
 }));
 
+// Optimized Chart Card
 const ChartCard = styled(Card)(({ theme }) => ({
+  ...glassBaseStyles,
   borderRadius: 20,
-  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
-  background: 'linear-gradient(145deg, #1e1e1e, #252525)',
-  border: '1px solid rgba(255, 255, 255, 0.05)',
-  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  position: 'relative',
+  overflow: 'hidden',
+  willChange: 'transform',
   '&:hover': {
-    transform: 'translateY(-4px)',
-    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
+    transform: 'translateY(-3px)',
+    background: 'rgba(255, 255, 255, 0.08)',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
   },
 }));
 
-const Dashboard: React.FC<{
-  accounts: any[];
-  projects: any[];
+// Simplified Floating Button
+const FloatingButton = styled(Button)(({ theme }) => ({
+  borderRadius: 16,
+  padding: '12px 24px',
+  background: 'linear-gradient(135deg, #007acc 0%, #3399dd 100%)',
+  boxShadow: '0 4px 16px rgba(0, 122, 204, 0.3)',
+  position: 'relative',
+  overflow: 'hidden',
+  fontWeight: 700,
+  fontSize: '1.1rem',
+  textTransform: 'none',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  willChange: 'transform',
+  '&:hover': {
+    transform: 'translateY(-2px)',
+    background: 'linear-gradient(135deg, #005a9e 0%, #007acc 100%)',
+    boxShadow: '0 8px 24px rgba(0, 122, 204, 0.4)',
+  },
+  // Removed expensive animations
+}));
+
+// Simplified Progress Bar
+const OptimizedProgressBar = styled(LinearProgress)<{ progressColor?: string }>(({ theme, progressColor }) => ({
+  height: 12,
+  borderRadius: 8,
+  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  overflow: 'hidden',
+  '& .MuiLinearProgress-bar': {
+    borderRadius: 8,
+    background: progressColor || 'linear-gradient(90deg, #007acc, #3399dd)',
+    transition: 'width 0.8s ease',
+  },
+}));
+
+// Props interface
+interface DashboardProps {
+  accounts: GitAccount[];
+  projects: Project[];
   onAddAccount: () => void;
   onViewChange: (view: string) => void;
-}> = ({ accounts, projects, onAddAccount, onViewChange }) => {
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ 
+  accounts = [], 
+  projects = [], 
+  onAddAccount, 
+  onViewChange 
+}) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  
+  useEffect(() => {
+    // Delayed load for smoother initial render
+    const timer = setTimeout(() => setIsLoaded(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   const activeAccounts = accounts.filter(acc => acc.isDefault !== false).length;
   const totalProjects = projects.length;
   
-  // Mock data for charts
   const accountUsage = [
-    { name: 'Work Account', usage: 65 },
-    { name: 'Personal', usage: 35 },
-    { name: 'Open Source', usage: 20 },
+    { name: 'Work Account', usage: 65, color: 'linear-gradient(90deg, #007acc, #3399dd)' },
+    { name: 'Personal', usage: 35, color: 'linear-gradient(90deg, #4caf50, #81c784)' },
+    { name: 'Open Source', usage: 20, color: 'linear-gradient(90deg, #ff9800, #ffc947)' },
   ];
   
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography 
-            variant="h1" 
-            sx={{ 
-              fontWeight: 800, 
-              mb: 1,
-              background: 'linear-gradient(90deg, #007acc, #3399dd)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}
-          >
-            Dashboard
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Welcome back! Here's what's happening with your Git accounts.
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Tooltip title="Refresh">
-            <IconButton 
+    <>
+      <BackgroundContainer />
+      <Box sx={{ p: 3, position: 'relative', zIndex: 1 }}>
+        {/* Header Section */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 4,
+          ...glassBaseStyles,
+          borderRadius: 2,
+          p: 2.5,
+          opacity: isLoaded ? 1 : 0,
+          transform: isLoaded ? 'translateY(0)' : 'translateY(-10px)',
+          transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}>
+          <Box>
+            <Typography 
+              variant="h1" 
               sx={{ 
-                bgcolor: 'rgba(255, 255, 255, 0.08)',
-                '&:hover': {
-                  bgcolor: 'rgba(255, 255, 255, 0.12)',
-                  transform: 'rotate(45deg)',
-                },
-                transition: 'all 0.3s ease'
+                fontWeight: 800, 
+                mb: 0.5,
+                fontSize: '2.5rem',
+                background: 'linear-gradient(135deg, #007acc 0%, #3399dd 50%, #4caf50 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
               }}
             >
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
+              Dashboard
+            </Typography>
+            <Typography 
+              variant="body1" 
+              sx={{ 
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontSize: '1rem',
+              }}
+            >
+              Welcome back! Here's what's happening with your Git accounts.
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Tooltip title="Refresh Dashboard">
+              <IconButton 
+                sx={{ 
+                  ...glassBaseStyles,
+                  borderRadius: 2,
+                  width: 44,
+                  height: 44,
+                  '&:hover': {
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    transform: 'rotate(90deg)',
+                  },
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                <AutorenewIcon sx={{ color: '#007acc', fontSize: '1.25rem' }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
-      </Box>
-      
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Avatar sx={{ 
-                  bgcolor: alpha('#007acc', 0.2), 
-                  mr: 2,
-                  width: 56,
-                  height: 56
-                }}>
-                  <PersonIcon sx={{ color: '#007acc', fontSize: '2rem' }} />
-                </Avatar>
-                <Box>
-                  <Typography variant="h1" component="h3" sx={{ fontWeight: 800 }}>
-                    {accounts.length}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Total Accounts
-                  </Typography>
-                </Box>
-              </Box>
-              <Chip 
-                icon={<TrendingUpIcon />} 
-                label="+12% from last month" 
-                size="small" 
-                sx={{ 
-                  bgcolor: alpha('#4caf50', 0.2),
-                  color: '#4caf50',
-                  fontWeight: 600
-                }} 
-              />
-            </CardContent>
-          </StatCard>
-        </Grid>
         
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Avatar sx={{ 
-                  bgcolor: alpha('#4caf50', 0.2), 
-                  mr: 2,
-                  width: 56,
-                  height: 56
-                }}>
-                  <CheckCircleIcon sx={{ color: '#4caf50', fontSize: '2rem' }} />
-                </Avatar>
-                <Box>
-                  <Typography variant="h1" component="h3" sx={{ fontWeight: 800 }}>
-                    {activeAccounts}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Active Accounts
-                  </Typography>
-                </Box>
-              </Box>
-              <Chip 
-                icon={<CheckCircleIcon />} 
-                label="All active" 
-                size="small" 
-                sx={{ 
-                  bgcolor: alpha('#4caf50', 0.2),
-                  color: '#4caf50',
-                  fontWeight: 600
-                }} 
-              />
-            </CardContent>
-          </StatCard>
-        </Grid>
-        
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Avatar sx={{ 
-                  bgcolor: alpha('#2196f3', 0.2), 
-                  mr: 2,
-                  width: 56,
-                  height: 56
-                }}>
-                  <FolderIcon sx={{ color: '#2196f3', fontSize: '2rem' }} />
-                </Avatar>
-                <Box>
-                  <Typography variant="h1" component="h3" sx={{ fontWeight: 800 }}>
-                    {totalProjects}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Projects
-                  </Typography>
-                </Box>
-              </Box>
-              <Chip 
-                icon={<TrendingUpIcon />} 
-                label="+5% from last week" 
-                size="small" 
-                sx={{ 
-                  bgcolor: alpha('#4caf50', 0.2),
-                  color: '#4caf50',
-                  fontWeight: 600
-                }} 
-              />
-            </CardContent>
-          </StatCard>
-        </Grid>
-        
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Avatar sx={{ 
-                  bgcolor: alpha('#ff9800', 0.2), 
-                  mr: 2,
-                  width: 56,
-                  height: 56
-                }}>
-                  <BarChartIcon sx={{ color: '#ff9800', fontSize: '2rem' }} />
-                </Avatar>
-                <Box>
-                  <Typography variant="h1" component="h3" sx={{ fontWeight: 800 }}>
-                    87%
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Efficiency
-                  </Typography>
-                </Box>
-              </Box>
-              <Chip 
-                icon={<WarningIcon />} 
-                label="Good performance" 
-                size="small" 
-                sx={{ 
-                  bgcolor: alpha('#ff9800', 0.2),
-                  color: '#ff9800',
-                  fontWeight: 600
-                }} 
-              />
-            </CardContent>
-          </StatCard>
-        </Grid>
-      </Grid>
-      
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} md={8}>
-          <ChartCard>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h2" sx={{ fontWeight: 700 }}>Account Usage</Typography>
-                <Chip label="Last 30 days" size="small" variant="outlined" />
-              </Box>
-              
-              {accountUsage.map((account, index) => (
-                <Box key={index} sx={{ mb: 3 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{account.name}</Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 700 }}>{account.usage}%</Typography>
+        {/* Stats Grid - Reduced animation complexity */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {[
+            {
+              icon: PersonIcon,
+              value: accounts.length,
+              label: 'Total Accounts',
+              trend: '+12%',
+              color: '#007acc',
+              delay: 0
+            },
+            {
+              icon: CheckCircleIcon,
+              value: activeAccounts,
+              label: 'Active Accounts',
+              trend: 'All active',
+              color: '#4caf50',
+              delay: 0.1
+            },
+            {
+              icon: FolderIcon,
+              value: totalProjects,
+              label: 'Projects',
+              trend: '+5%',
+              color: '#2196f3',
+              delay: 0.2
+            },
+            {
+              icon: BarChartIcon,
+              value: '87%',
+              label: 'Efficiency',
+              trend: 'Good',
+              color: '#ff9800',
+              delay: 0.3
+            }
+          ].map((stat, index) => (
+            <Grid item xs={12} sm={6} md={3} key={index}>
+              <StatCard sx={{ 
+                opacity: isLoaded ? 1 : 0,
+                transform: isLoaded ? 'translateY(0)' : 'translateY(20px)',
+                transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                transitionDelay: `${stat.delay}s`,
+                // Only animate on hover, not continuously
+                '&:hover': {
+                  animation: `${subtleFloat} 2s ease-in-out`,
+                }
+              }}>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Avatar sx={{ 
+                      bgcolor: alpha(stat.color, 0.15), 
+                      mr: 2,
+                      width: 56,
+                      height: 56,
+                      border: `1px solid ${alpha(stat.color, 0.2)}`,
+                    }}>
+                      <stat.icon sx={{ color: stat.color, fontSize: '1.75rem' }} />
+                    </Avatar>
+                    <Box>
+                      <Typography 
+                        variant="h2" 
+                        component="h3" 
+                        sx={{ 
+                          fontWeight: 800,
+                          fontSize: '2rem',
+                          color: stat.color,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {stat.value}
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          color: 'rgba(255, 255, 255, 0.7)',
+                          fontWeight: 500,
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        {stat.label}
+                      </Typography>
+                    </Box>
                   </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={account.usage} 
+                  <Chip 
+                    icon={<TrendingUpIcon sx={{ fontSize: '0.875rem' }} />} 
+                    label={stat.trend}
+                    size="small" 
+                    sx={{ 
+                      bgcolor: alpha(stat.color, 0.15),
+                      color: stat.color,
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      height: 24,
+                    }} 
+                  />
+                </CardContent>
+              </StatCard>
+            </Grid>
+          ))}
+        </Grid>
+        
+        {/* Main Content Grid */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {/* Account Usage Chart */}
+          <Grid item xs={12} md={8}>
+            <ChartCard sx={{
+              opacity: isLoaded ? 1 : 0,
+              transform: isLoaded ? 'translateY(0)' : 'translateY(20px)',
+              transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+              transitionDelay: '0.3s'
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Typography 
+                    variant="h3" 
+                    sx={{ 
+                      fontWeight: 700,
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      fontSize: '1.25rem',
+                    }}
+                  >
+                    Account Usage
+                  </Typography>
+                  <Chip 
+                    label="Last 30 days" 
+                    size="small" 
                     sx={{
-                      height: 12,
-                      borderRadius: 6,
                       bgcolor: 'rgba(255, 255, 255, 0.08)',
-                      '& .MuiLinearProgress-bar': {
-                        borderRadius: 6,
-                        bgcolor: index === 0 ? '#007acc' : index === 1 ? '#4caf50' : '#ff9800',
-                        backgroundImage: index === 0 
-                          ? 'linear-gradient(90deg, #007acc, #3399dd)' 
-                          : index === 1 
-                            ? 'linear-gradient(90deg, #4caf50, #81c784)' 
-                            : 'linear-gradient(90deg, #ff9800, #ffc947)',
-                      },
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      fontSize: '0.75rem',
                     }}
                   />
                 </Box>
-              ))}
-            </CardContent>
-          </ChartCard>
+                
+                {accountUsage.map((account, index) => (
+                  <Box key={index} sx={{ mb: 3 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography 
+                        variant="body1" 
+                        sx={{ 
+                          fontWeight: 600,
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        {account.name}
+                      </Typography>
+                      <Typography 
+                        variant="body1" 
+                        sx={{ 
+                          fontWeight: 700,
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        {account.usage}%
+                      </Typography>
+                    </Box>
+                    <OptimizedProgressBar 
+                      variant="determinate" 
+                      value={account.usage}
+                      progressColor={account.color}
+                    />
+                  </Box>
+                ))}
+              </CardContent>
+            </ChartCard>
+          </Grid>
+          
+          {/* Quick Actions */}
+          <Grid item xs={12} md={4}>
+            <ChartCard sx={{ 
+              height: '100%',
+              opacity: isLoaded ? 1 : 0,
+              transform: isLoaded ? 'translateY(0)' : 'translateY(20px)',
+              transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+              transitionDelay: '0.4s'
+            }}>
+              <CardContent sx={{ p: 3, height: '100%' }}>
+                <Typography 
+                  variant="h3" 
+                  sx={{ 
+                    fontWeight: 700, 
+                    mb: 3,
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    fontSize: '1.25rem',
+                  }}
+                >
+                  Quick Actions
+                </Typography>
+                
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <QuickActionCard onClick={() => onViewChange('accounts')}>
+                    <Avatar sx={{ 
+                      bgcolor: alpha('#007acc', 0.15), 
+                      mb: 2, 
+                      width: 64, 
+                      height: 64,
+                      border: '1px solid rgba(0, 122, 204, 0.2)',
+                    }}>
+                      <PersonIcon sx={{ fontSize: 32, color: '#007acc' }} />
+                    </Avatar>
+                    <Typography 
+                      variant="h4" 
+                      sx={{ 
+                        mb: 1, 
+                        fontWeight: 700,
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        fontSize: '1.1rem',
+                      }}
+                    >
+                      Manage Accounts
+                    </Typography>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        mb: 2,
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      Add, edit, or remove Git accounts
+                    </Typography>
+                    <Button 
+                      variant="contained" 
+                      endIcon={<ArrowForwardIcon />}
+                      size="small"
+                      sx={{ 
+                        borderRadius: 2,
+                        px: 2,
+                        py: 1,
+                        background: 'linear-gradient(135deg, #007acc, #3399dd)',
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #005a9e, #007acc)',
+                        },
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      Go
+                    </Button>
+                  </QuickActionCard>
+                  
+                  <QuickActionCard onClick={() => onViewChange('project')}>
+                    <Avatar sx={{ 
+                      bgcolor: alpha('#4caf50', 0.15), 
+                      mb: 2, 
+                      width: 64, 
+                      height: 64,
+                      border: '1px solid rgba(76, 175, 80, 0.2)',
+                    }}>
+                      <FolderIcon sx={{ fontSize: 32, color: '#4caf50' }} />
+                    </Avatar>
+                    <Typography 
+                      variant="h4" 
+                      sx={{ 
+                        mb: 1, 
+                        fontWeight: 700,
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        fontSize: '1.1rem',
+                      }}
+                    >
+                      Switch Identity
+                    </Typography>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        mb: 2,
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      Change Git identity for current project
+                    </Typography>
+                    <Button 
+                      variant="contained" 
+                      endIcon={<ArrowForwardIcon />}
+                      size="small"
+                      sx={{ 
+                        borderRadius: 2,
+                        px: 2,
+                        py: 1,
+                        background: 'linear-gradient(135deg, #4caf50, #81c784)',
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #388e3c, #4caf50)',
+                        },
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      Go
+                    </Button>
+                  </QuickActionCard>
+                </Box>
+              </CardContent>
+            </ChartCard>
+          </Grid>
         </Grid>
         
-        <Grid item xs={12} md={4}>
-          <ChartCard sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h2" sx={{ fontWeight: 700, mb: 3 }}>Quick Actions</Typography>
-              
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <QuickActionCard onClick={() => onViewChange('accounts')} sx={{ animation: `${pulse} 3s infinite` }}>
-                  <Avatar sx={{ 
-                    bgcolor: alpha('#007acc', 0.2), 
-                    mb: 2, 
-                    width: 64, 
-                    height: 64,
-                    '&:hover': {
-                      bgcolor: alpha('#007acc', 0.3),
-                    }
-                  }}>
-                    <PersonIcon sx={{ fontSize: 32, color: '#007acc' }} />
-                  </Avatar>
-                  <Typography variant="h3" sx={{ mb: 1, fontWeight: 700 }}>Manage Accounts</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Add, edit, or remove Git accounts
-                  </Typography>
-                  <Button 
-                    variant="contained" 
-                    endIcon={<ArrowForwardIcon />}
-                    sx={{ 
-                      borderRadius: 6,
-                      px: 3,
-                      py: 1,
-                      background: 'linear-gradient(90deg, #007acc, #3399dd)',
-                      '&:hover': {
-                        background: 'linear-gradient(90deg, #005a9e, #007acc)',
-                        transform: 'translateY(-2px)',
-                      },
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    Go
-                  </Button>
-                </QuickActionCard>
-                
-                <QuickActionCard onClick={() => onViewChange('project')} sx={{ animation: `${pulse} 4s infinite` }}>
-                  <Avatar sx={{ 
-                    bgcolor: alpha('#4caf50', 0.2), 
-                    mb: 2, 
-                    width: 64, 
-                    height: 64,
-                    '&:hover': {
-                      bgcolor: alpha('#4caf50', 0.3),
-                    }
-                  }}>
-                    <FolderIcon sx={{ fontSize: 32, color: '#4caf50' }} />
-                  </Avatar>
-                  <Typography variant="h3" sx={{ mb: 1, fontWeight: 700 }}>Switch Identity</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Change Git identity for current project
-                  </Typography>
-                  <Button 
-                    variant="contained" 
-                    color="success"
-                    endIcon={<ArrowForwardIcon />}
-                    sx={{ 
-                      borderRadius: 6,
-                      px: 3,
-                      py: 1,
-                      '&:hover': {
-                        transform: 'translateY(-2px)',
-                      },
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    Go
-                  </Button>
-                </QuickActionCard>
-              </Box>
-            </CardContent>
-          </ChartCard>
-        </Grid>
-      </Grid>
-      
-      <Box sx={{ textAlign: 'center', py: 4 }}>
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          size="large"
-          sx={{ 
-            borderRadius: 12, 
-            px: 5, 
-            py: 2,
-            background: 'linear-gradient(90deg, #007acc, #3399dd)',
-            boxShadow: '0 6px 16px rgba(0, 122, 204, 0.4)',
-            '&:hover': {
-              background: 'linear-gradient(90deg, #005a9e, #007acc)',
-              boxShadow: '0 8px 20px rgba(0, 122, 204, 0.6)',
-              transform: 'translateY(-3px)',
-            },
-            transition: 'all 0.3s ease',
-            fontWeight: 700,
-            fontSize: '1.1rem'
-          }}
-          onClick={onAddAccount}
-        >
-          Add New Account
-        </Button>
+        {/* Call to Action */}
+        <Box sx={{ textAlign: 'center', py: 3 }}>
+          <FloatingButton
+            startIcon={<AddIcon />}
+            size="large"
+            onClick={onAddAccount}
+          >
+            Add New Account
+          </FloatingButton>
+        </Box>
       </Box>
-    </Box>
+    </>
   );
 };
 

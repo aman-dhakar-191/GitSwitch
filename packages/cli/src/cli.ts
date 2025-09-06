@@ -1921,11 +1921,11 @@ async function launchDesktopApp(projectPath: string): Promise<void> {
       });
       
       // Log output for debugging
-      child.stdout?.on('data', (data) => {
+      child.stdout?.on('data', (data: any) => {
         console.log(`Desktop app output: ${data}`);
       });
       
-      child.stderr?.on('data', (data) => {
+      child.stderr?.on('data', (data: any) => {
         const message = data.toString();
         // Ignore GPU process warnings
         if (!message.includes('GPU process exited') && !message.includes('gpu_process_host')) {
@@ -1933,7 +1933,7 @@ async function launchDesktopApp(projectPath: string): Promise<void> {
         }
       });
       
-      child.on('error', (error) => {
+      child.on('error', (error: any) => {
         console.error('❌ Failed to spawn desktop app:', error.message);
         reject(error);
       });
