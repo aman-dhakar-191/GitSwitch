@@ -5,7 +5,6 @@ const cleanCSS = require('gulp-clean-css');
 const rename = require('gulp-rename');
 const gulpIf = require('gulp-if');
 const sourcemaps = require('gulp-sourcemaps');
-const { deleteAsync } = require('del');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -53,6 +52,7 @@ gulp.task('clean', async function() {
   ];
   
   try {
+    const { deleteAsync } = await import('del');
     await deleteAsync(dirsToClean, { force: true });
     console.log('✅ Clean completed');
   } catch (error) {
