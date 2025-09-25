@@ -139,7 +139,18 @@ program
           console.log(`   Account: ${account.email} (${account.name})`);
         }
         console.log(`   Status: ${project.status}`);
-        console.log(`   Last accessed: ${project.lastAccessed.toLocaleDateString()}`);
+        
+        // Safely handle lastAccessed date formatting
+        let lastAccessedText = 'Unknown';
+        if (project.lastAccessed) {
+          try {
+            const lastAccessedDate = project.lastAccessed instanceof Date ? project.lastAccessed : new Date(project.lastAccessed);
+            lastAccessedText = lastAccessedDate.toLocaleDateString();
+          } catch (error) {
+            lastAccessedText = 'Invalid date';
+          }
+        }
+        console.log(`   Last accessed: ${lastAccessedText}`);
         console.log('');
       }
       
@@ -237,7 +248,18 @@ program
           console.log(`   Description: ${account.description}`);
         }
         console.log(`   Usage: ${account.usageCount} times`);
-        console.log(`   Last used: ${account.lastUsed ? account.lastUsed.toLocaleDateString() : 'Never'}`);
+        
+        // Safely handle lastUsed date formatting
+        let lastUsedText = 'Never';
+        if (account.lastUsed) {
+          try {
+            const lastUsedDate = account.lastUsed instanceof Date ? account.lastUsed : new Date(account.lastUsed);
+            lastUsedText = lastUsedDate.toLocaleDateString();
+          } catch (error) {
+            lastUsedText = 'Invalid date';
+          }
+        }
+        console.log(`   Last used: ${lastUsedText}`);
         console.log('');
       }
       

@@ -42,7 +42,8 @@ export class StorageManager {
       return accounts.map((account: any) => ({
         ...account,
         createdAt: new Date(account.createdAt),
-        updatedAt: new Date(account.updatedAt)
+        updatedAt: new Date(account.updatedAt),
+        lastUsed: account.lastUsed ? new Date(account.lastUsed) : new Date()
       }));
     } catch (error) {
       console.error('Failed to load accounts:', error);
@@ -133,7 +134,8 @@ export class StorageManager {
       return projects.map((project: any) => ({
         ...project,
         lastAccessed: new Date(project.lastAccessed),
-        createdAt: new Date(project.createdAt)
+        createdAt: new Date(project.createdAt),
+        lastCommit: project.lastCommit ? new Date(project.lastCommit) : undefined
       }));
     } catch (error) {
       console.error('Failed to load projects:', error);
