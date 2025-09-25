@@ -4,7 +4,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-const cliPath = path.join(__dirname, 'packages', 'cli', 'dist', 'cli.js');
+const cliPath = path.join(__dirname, '..', 'packages', 'cli', 'dist', 'cli.js');
 
 console.log('🧪 Testing GitSwitch CLI...');
 console.log('📍 CLI Path:', cliPath);
