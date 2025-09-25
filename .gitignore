@@ -4,6 +4,8 @@ node_modules
 packages/desktop/release/
 packages/*/lib/
 packages/*/dist/
+build/
+release/
 *.exe
 *.app
 *.dmg
@@ -11,6 +13,10 @@ packages/*/dist/
 *.rpm
 *.zip
 *.tar.gz
+
+# Minified files from gulp
+*.min.js
+*.min.js.map
 
 # Compiled JavaScript and TypeScript build outputs
 *.js.map

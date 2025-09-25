@@ -44,6 +44,7 @@ const path = __importStar(require("path"));
 class GitManager {
     /**
      * Get current git configuration for a repository
+     * Checks local config first, then falls back to global config
      */
     getCurrentConfig(repoPath) {
         console.log(`[GitManager] getCurrentConfig called with repoPath: ${repoPath}`);
@@ -53,19 +54,103 @@ class GitManager {
                 return null;
             }
             console.log(`[GitManager] Getting git config for ${repoPath}`);
-            const name = this.executeGitCommand('config user.name', repoPath).trim();
-            const email = this.executeGitCommand('config user.email', repoPath).trim();
+            // First try local config
+            let name = '';
+            let email = '';
+            let source = 'local';
+            try {
+                name = this.executeGitCommand('config --local user.name', repoPath).trim();
+                email = this.executeGitCommand('config --local user.email', repoPath).trim();
+            }
+            catch (error) {
+                console.log(`[GitManager] No local git config found, checking global config`);
+            }
+            // If local config is missing, try global config
+            if (!name || !email) {
+                try {
+                    const globalName = this.executeGitCommand('config --global user.name', repoPath).trim();
+                    const globalEmail = this.executeGitCommand('config --global user.email', repoPath).trim();
+                    if (globalName || globalEmail) {
+                        name = name || globalName;
+                        email = email || globalEmail;
+                        source = 'global';
+                        console.log(`[GitManager] Using global git config as fallback`);
+                    }
+                }
+                catch (error) {
+                    console.log(`[GitManager] No global git config found either`);
+                }
+            }
             if (!name || !email) {
                 console.log(`[GitManager] Missing name or email in git config for ${repoPath}`);
                 return null;
             }
             const config = { name, email };
-            console.log(`[GitManager] Retrieved git config:`, config);
+            console.log(`[GitManager] Retrieved git config from ${source}:`, config);
             return config;
         }
         catch (error) {
             console.error('[GitManager] Failed to get git config:', error);
+            // Log detailed error for debugging but don't throw - return null for graceful handling
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            console.error(`[GitManager] Git config retrieval failed for ${repoPath}: ${errorMsg}`);
+            // For certain critical errors, we might want to inform the user
+            if (errorMsg.includes('Git is not installed')) {
+                console.error('[GitManager] CRITICAL: Git is not installed on this system');
+            }
+            else if (errorMsg.includes('not a git repository')) {
+                console.warn(`[GitManager] Directory ${repoPath} is not a git repository`);
+            }
             return null;
+        }
+    }
+    /**
+     * Get global git configuration
+     */
+    getGlobalConfig() {
+        console.log(`[GitManager] getGlobalConfig called`);
+        try {
+            const name = this.executeGitCommand('config --global user.name', process.cwd()).trim();
+            const email = this.executeGitCommand('config --global user.email', process.cwd()).trim();
+            if (!name || !email) {
+                console.log(`[GitManager] Missing global git config`);
+                return null;
+            }
+            const config = { name, email };
+            console.log(`[GitManager] Retrieved global git config:`, config);
+            return config;
+        }
+        catch (error) {
+            console.error('[GitManager] Failed to get global git config:', error);
+            // Provide helpful context for global config failures
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            if (errorMsg.includes('Git is not installed')) {
+                console.error('[GitManager] CRITICAL: Cannot read global git config - Git is not installed');
+            }
+            else if (errorMsg.includes('not configured')) {
+                console.warn('[GitManager] Global git identity is not configured. User should run: git config --global user.name "Name" && git config --global user.email "email@example.com"');
+            }
+            return null;
+        }
+    }
+    /**
+     * Check if repository has local git config set
+     */
+    hasLocalConfig(repoPath) {
+        console.log(`[GitManager] hasLocalConfig called with repoPath: ${repoPath}`);
+        try {
+            if (!this.isGitRepository(repoPath)) {
+                return false;
+            }
+            const name = this.executeGitCommand('config --local user.name', repoPath).trim();
+            const email = this.executeGitCommand('config --local user.email', repoPath).trim();
+            const hasLocal = !!(name && email);
+            console.log(`[GitManager] Repository has local config: ${hasLocal}`);
+            return hasLocal;
+        }
+        catch (error) {
+            console.log(`[GitManager] No local config found for ${repoPath}`);
+            return false;
         }
     }
     /**
@@ -74,18 +159,42 @@ class GitManager {
     setConfig(repoPath, config) {
         console.log(`[GitManager] setConfig called with repoPath: ${repoPath}`, config);
         try {
+            // Validate inputs
+            if (!config.name || !config.email) {
+                throw new Error(`Invalid git configuration: both name and email are required. Got name: "${config.name}", email: "${config.email}"`);
+            }
             if (!this.isGitRepository(repoPath)) {
-                throw new Error('Not a git repository');
+                throw new Error(`Cannot set git configuration: '${repoPath}' is not a git repository. Please ensure you're in a valid git project directory.`);
             }
             console.log(`[GitManager] Setting git config for ${repoPath}`);
-            this.executeGitCommand(`config user.name "${config.name}"`, repoPath);
-            this.executeGitCommand(`config user.email "${config.email}"`, repoPath);
+            // Set name first, then email
+            try {
+                this.executeGitCommand(`config user.name "${config.name}"`, repoPath);
+            }
+            catch (error) {
+                throw new Error(`Failed to set git user name: ${error instanceof Error ? error.message : String(error)}`);
+            }
+            try {
+                this.executeGitCommand(`config user.email "${config.email}"`, repoPath);
+            }
+            catch (error) {
+                // If email fails, try to rollback the name change
+                try {
+                    console.warn('[GitManager] Rolling back name change due to email failure');
+                    this.executeGitCommand('config --unset user.name', repoPath);
+                }
+                catch (rollbackError) {
+                    console.error('[GitManager] Failed to rollback name change:', rollbackError);
+                }
+                throw new Error(`Failed to set git user email: ${error instanceof Error ? error.message : String(error)}`);
+            }
             console.log(`[GitManager] Successfully set git config for ${repoPath}`);
             return true;
         }
         catch (error) {
             console.error('[GitManager] Failed to set git config:', error);
-            return false;
+            // Re-throw with more context for the calling code
+            throw new Error(`Git configuration update failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
     /**
@@ -182,7 +291,7 @@ class GitManager {
         return this.setConfig(repoPath, backup);
     }
     /**
-     * Execute a git command in the specified directory
+     * Execute a git command in the specified directory with enhanced error handling
      */
     executeGitCommand(command, cwd) {
         console.log(`[GitManager] executeGitCommand: git ${command} in ${cwd}`);
@@ -197,8 +306,47 @@ class GitManager {
         }
         catch (error) {
             console.error(`[GitManager] Git command failed: ${error.message}`);
-            throw new Error(`Git command failed: ${error.message}`);
+            // Provide user-friendly error messages based on common scenarios
+            const errorMessage = this.getGitErrorMessage(command, error, cwd);
+            throw new Error(errorMessage);
         }
+    }
+    /**
+     * Generate user-friendly error messages for common git command failures
+     */
+    getGitErrorMessage(command, error, cwd) {
+        const errorOutput = error.stderr || error.message || '';
+        const lowerError = errorOutput.toLowerCase();
+        // Check for common git error scenarios
+        if (lowerError.includes('not a git repository')) {
+            return `Directory '${cwd}' is not a git repository. Please initialize git first with 'git init'.`;
+        }
+        if (lowerError.includes('git: command not found') || lowerError.includes("'git' is not recognized")) {
+            return `Git is not installed or not in PATH. Please install Git from https://git-scm.com/`;
+        }
+        if (command.includes('config') && (lowerError.includes('no such file or directory') || lowerError.includes('key does not exist'))) {
+            if (command.includes('user.name') || command.includes('user.email')) {
+                return `Git identity is not configured. Please set your git identity with:\n  git config user.name "Your Name"\n  git config user.email "your.email@example.com"`;
+            }
+            return `Git configuration key not found. The requested configuration does not exist.`;
+        }
+        if (command.includes('remote') && lowerError.includes('no such remote')) {
+            return `No git remote named 'origin' found. This repository may not be connected to a remote server.`;
+        }
+        if (lowerError.includes('permission denied') || lowerError.includes('access denied')) {
+            return `Permission denied accessing git repository at '${cwd}'. Please check file permissions and repository access rights.`;
+        }
+        if (lowerError.includes('fatal: not a valid object name')) {
+            return `Git repository appears to be corrupted or empty. Try running 'git status' to check repository state.`;
+        }
+        if (lowerError.includes('unable to access') || lowerError.includes('could not read')) {
+            return `Unable to access git repository at '${cwd}'. The directory may not exist or may be inaccessible.`;
+        }
+        if (command.includes('rev-parse') && lowerError.includes('not a git repository')) {
+            return `'${cwd}' is not inside a git repository. Please navigate to a git project directory.`;
+        }
+        // Generic fallback with more context
+        return `Git operation failed: ${command}\nLocation: ${cwd}\nError: ${errorOutput.split('\n')[0] || error.message}\nSuggestion: Check if the directory is a valid git repository and you have proper permissions.`;
     }
 }
 exports.GitManager = GitManager;
