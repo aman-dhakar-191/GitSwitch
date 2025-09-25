@@ -1,0 +1,110 @@
+name: Build and Release GitSwitch
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-package:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: package-lock.json
+          
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Cache Node modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          node_modules
+          packages/*/node_modules
+          ~/.npm
+        key: ${{ runner.os }}-nodemodules-${{ hashFiles('**/package-lock.json', '**/package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nodemodules-
+        
+    - name: Build production version
+      run: npm run gulp:prod
+      
+    - name: Create installer and setup files
+      run: npm run gulp:setup
+      
+    - name: List created files
+      run: |
+        echo "=== Release directory ==="
+        ls -la release/ || echo "No release directory"
+        echo "=== Desktop release directory ==="
+        ls -la packages/desktop/release/
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: gitswitch-release-${{ github.sha }}
+        path: |
+          packages/desktop/release/GitSwitch-Setup.zip
+          packages/desktop/release/Install-GitSwitch.bat
+          packages/desktop/release/INSTALLATION.md
+          release/
+        retention-days: 30
+        
+  release:
+    needs: build-and-package
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: gitswitch-release-${{ github.sha }}
+        path: ./artifacts
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          ./artifacts/packages/desktop/release/GitSwitch-Setup.zip
+          ./artifacts/packages/desktop/release/Install-GitSwitch.bat
+          ./artifacts/packages/desktop/release/INSTALLATION.md
+        name: GitSwitch ${{ github.ref_name }}
+        body: |
+          ## GitSwitch Release ${{ github.ref_name }}
+          
+          ### 📦 Installation Files
+          - **GitSwitch-Setup.zip** - Main application package (~21MB)
+          - **Install-GitSwitch.bat** - Windows batch installer
+          - **INSTALLATION.md** - Installation instructions
+          
+          ### 🚀 How to Install
+          1. Download `GitSwitch-Setup.zip`
+          2. Extract the ZIP file
+          3. Run `Install-GitSwitch.bat` as administrator (Windows)
+          4. Or follow instructions in `INSTALLATION.md`
+          
+          ### 📋 Requirements
+          - Node.js 18 or higher
+          - Windows 10 or higher (for .bat installer)
+          - Git installed and in PATH
+          
+          Built with production optimization and minification enabled.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
