@@ -51,3 +51,11 @@ coverage/
 .env.development.local
 .env.test.local
 .env.production.local
+packages/cli/dist/cli.js
+packages/core/dist/GitManager.js
+packages/core/dist/index.d.ts
+packages/core/dist/index.js
+packages/desktop/dist/main.js
+packages/desktop/dist/renderer.js
+packages/desktop/dist/renderer.js.LICENSE.txt
+packages/types/dist/index.d.ts

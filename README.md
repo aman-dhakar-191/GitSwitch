@@ -153,6 +153,57 @@ cd packages/cli && npm run dev
 - [ ] Advanced dashboard UI (analytics visualization)
 - [ ] System integration (tray, shortcuts)
 
+## 🧪 Demo & Testing
+
+### Interactive Demo
+You can run various demo scripts to test GitSwitch functionality:
+
+```bash
+# Basic CLI demo
+node demo.js
+
+# Stage-specific feature testing
+node stage-1-mvp.js      # Core MVP features
+```
+
+### Manual Testing Commands
+
+#### Account Management
+```bash
+# Add GitHub account
+npm run gitswitch account add github --name "work" --email "work@company.com"
+
+# Switch to specific account
+npm run gitswitch switch --account "work"
+
+# List all accounts  
+npm run gitswitch account list
+```
+
+#### Project Discovery
+```bash
+# Scan for git projects (default: current directory)
+npm run gitswitch scan
+
+# Scan specific directory with depth limit
+npm run gitswitch scan /path/to/projects --depth 2
+
+# List discovered projects
+npm run gitswitch list
+
+# Get project details
+npm run gitswitch info [project-name]
+```
+
+#### Smart Switching
+```bash
+# Switch to project (auto-detects best account)
+npm run gitswitch switch my-project
+
+# Force switch with specific account
+npm run gitswitch switch my-project --account work
+```
+
 ### 🚀 Live Demo Results
 
 ```bash
@@ -189,10 +240,15 @@ $ npm run gitswitch list
 
 GitSwitch follows a staged development approach. See the development guide and stage-specific documentation:
 
-- [`development-guide.md`](./development-guide.md) - How to use stage-based development
-- [`stage-1-mvp.md`](./stage-1-mvp.md) - Current stage specifications
-- [`stage-2-enhanced.md`](./stage-2-enhanced.md) - Next stage features
-- [`stage-3-advanced.md`](./stage-3-advanced.md) - Advanced features
+- [`docs/development-guide.md`](./docs/development-guide.md) - How to use stage-based development
+- [`docs/stage-1-mvp.md`](./docs/stage-1-mvp.md) - Current stage specifications
+- [`docs/stage-2-enhanced.md`](./docs/stage-2-enhanced.md) - Next stage features
+- [`docs/stage-3-advanced.md`](./docs/stage-3-advanced.md) - Advanced features
+
+### Project Structure
+- `docs/` - All project documentation and development guides
+- `scripts/` - Development, testing, and release scripts
+- `packages/` - Core codebase (CLI, desktop app, shared libraries)
 
 ## 📄 License
 

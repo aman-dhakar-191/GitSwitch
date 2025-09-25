@@ -9,16 +9,20 @@
 ## 🎯 Stage Objectives
 
 ### Primary Goals
-- [ ] CLI tool that works with `gitswitch .` command
-- [ ] Basic desktop app for account management  
-- [ ] Git config switching functionality
-- [ ] Local project detection and mapping
-- [ ] Secure account credential storage
+- [x] CLI tool that works with `gitswitch .` command
+- [x] Basic desktop app for account management  
+- [x] Git config switching functionality
+- [x] Local project detection and mapping
+- [x] Secure account credential storage
+- [x] **BONUS: Git hooks via CLI** (prevents wrong identity commits)
+  - ✅ Full CLI implementation: `gitswitch hooks --install/--remove/--status`
+  - 📋 Desktop UI: Planned for Stage 2 (backend ready, UI needs connection)
 
 ### Success Criteria
 - CLI command launches desktop app for current project
 - Users can add/manage multiple git accounts
 - Git identity switches correctly per project
+- **Git hooks prevent wrong identity commits** 
 - 10+ beta testers using daily
 - Zero data loss or corruption
 
@@ -30,6 +34,8 @@
 ```bash
 # Core commands for MVP
 gitswitch .                 # Open app for current project
+gitswitch status           # Show current git identity
+gitswitch hooks --install  # Install commit validation hooks (CLI only)
 gitswitch --version        # Show version
 gitswitch --help          # Show help
 ```
