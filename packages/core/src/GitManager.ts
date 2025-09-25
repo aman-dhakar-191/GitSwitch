@@ -10,6 +10,7 @@ import { GitConfig } from '@gitswitch/types';
 export class GitManager {
   /**
    * Get current git configuration for a repository
+   * Checks local config first, then falls back to global config
    */
   getCurrentConfig(repoPath: string): GitConfig | null {
     console.log(`[GitManager] getCurrentConfig called with repoPath: ${repoPath}`);
@@ -20,8 +21,35 @@ export class GitManager {
       }
 
       console.log(`[GitManager] Getting git config for ${repoPath}`);
-      const name = this.executeGitCommand('config user.name', repoPath).trim();
-      const email = this.executeGitCommand('config user.email', repoPath).trim();
+      
+      // First try local config
+      let name = '';
+      let email = '';
+      let source = 'local';
+      
+      try {
+        name = this.executeGitCommand('config --local user.name', repoPath).trim();
+        email = this.executeGitCommand('config --local user.email', repoPath).trim();
+      } catch (error) {
+        console.log(`[GitManager] No local git config found, checking global config`);
+      }
+      
+      // If local config is missing, try global config
+      if (!name || !email) {
+        try {
+          const globalName = this.executeGitCommand('config --global user.name', repoPath).trim();
+          const globalEmail = this.executeGitCommand('config --global user.email', repoPath).trim();
+          
+          if (globalName || globalEmail) {
+            name = name || globalName;
+            email = email || globalEmail;
+            source = 'global';
+            console.log(`[GitManager] Using global git config as fallback`);
+          }
+        } catch (error) {
+          console.log(`[GitManager] No global git config found either`);
+        }
+      }
 
       if (!name || !email) {
         console.log(`[GitManager] Missing name or email in git config for ${repoPath}`);
@@ -29,11 +57,56 @@ export class GitManager {
       }
 
       const config = { name, email };
-      console.log(`[GitManager] Retrieved git config:`, config);
+      console.log(`[GitManager] Retrieved git config from ${source}:`, config);
       return config;
     } catch (error) {
       console.error('[GitManager] Failed to get git config:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get global git configuration
+   */
+  getGlobalConfig(): GitConfig | null {
+    console.log(`[GitManager] getGlobalConfig called`);
+    try {
+      const name = this.executeGitCommand('config --global user.name', process.cwd()).trim();
+      const email = this.executeGitCommand('config --global user.email', process.cwd()).trim();
+
+      if (!name || !email) {
+        console.log(`[GitManager] Missing global git config`);
+        return null;
+      }
+
+      const config = { name, email };
+      console.log(`[GitManager] Retrieved global git config:`, config);
+      return config;
+    } catch (error) {
+      console.error('[GitManager] Failed to get global git config:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if repository has local git config set
+   */
+  hasLocalConfig(repoPath: string): boolean {
+    console.log(`[GitManager] hasLocalConfig called with repoPath: ${repoPath}`);
+    try {
+      if (!this.isGitRepository(repoPath)) {
+        return false;
+      }
+
+      const name = this.executeGitCommand('config --local user.name', repoPath).trim();
+      const email = this.executeGitCommand('config --local user.email', repoPath).trim();
+      
+      const hasLocal = !!(name && email);
+      console.log(`[GitManager] Repository has local config: ${hasLocal}`);
+      return hasLocal;
+    } catch (error) {
+      console.log(`[GitManager] No local config found for ${repoPath}`);
+      return false;
     }
   }
 
