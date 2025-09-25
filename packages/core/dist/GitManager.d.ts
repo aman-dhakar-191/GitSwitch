@@ -6,8 +6,17 @@ import { GitConfig } from '@gitswitch/types';
 export declare class GitManager {
     /**
      * Get current git configuration for a repository
+     * Checks local config first, then falls back to global config
      */
     getCurrentConfig(repoPath: string): GitConfig | null;
+    /**
+     * Get global git configuration
+     */
+    getGlobalConfig(): GitConfig | null;
+    /**
+     * Check if repository has local git config set
+     */
+    hasLocalConfig(repoPath: string): boolean;
     /**
      * Set git configuration for a repository
      */
@@ -33,7 +42,11 @@ export declare class GitManager {
      */
     restoreConfig(repoPath: string, backup: GitConfig): boolean;
     /**
-     * Execute a git command in the specified directory
+     * Execute a git command in the specified directory with enhanced error handling
      */
     private executeGitCommand;
+    /**
+     * Generate user-friendly error messages for common git command failures
+     */
+    private getGitErrorMessage;
 }

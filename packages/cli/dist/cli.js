@@ -147,7 +147,18 @@ program
                 console.log(`   Account: ${account.email} (${account.name})`);
             }
             console.log(`   Status: ${project.status}`);
-            console.log(`   Last accessed: ${project.lastAccessed.toLocaleDateString()}`);
+            // Safely handle lastAccessed date formatting
+            let lastAccessedText = 'Unknown';
+            if (project.lastAccessed) {
+                try {
+                    const lastAccessedDate = project.lastAccessed instanceof Date ? project.lastAccessed : new Date(project.lastAccessed);
+                    lastAccessedText = lastAccessedDate.toLocaleDateString();
+                }
+                catch (error) {
+                    lastAccessedText = 'Invalid date';
+                }
+            }
+            console.log(`   Last accessed: ${lastAccessedText}`);
             console.log('');
         }
     }
@@ -233,7 +244,18 @@ program
                 console.log(`   Description: ${account.description}`);
             }
             console.log(`   Usage: ${account.usageCount} times`);
-            console.log(`   Last used: ${account.lastUsed ? account.lastUsed.toLocaleDateString() : 'Never'}`);
+            // Safely handle lastUsed date formatting
+            let lastUsedText = 'Never';
+            if (account.lastUsed) {
+                try {
+                    const lastUsedDate = account.lastUsed instanceof Date ? account.lastUsed : new Date(account.lastUsed);
+                    lastUsedText = lastUsedDate.toLocaleDateString();
+                }
+                catch (error) {
+                    lastUsedText = 'Invalid date';
+                }
+            }
+            console.log(`   Last used: ${lastUsedText}`);
             console.log('');
         }
     }
@@ -1655,93 +1677,132 @@ async function launchDesktopApp(projectPath) {
         console.log('🚀 Launching GitSwitch desktop app...');
         console.log('📝 This will open the desktop interface for managing git identities');
         try {
-            // For development: use the absolute GitSwitch workspace path
-            const devWorkspacePath = 'E:\\GitSwitch\\packages\\desktop';
-            const devMainPath = path.join(devWorkspacePath, 'dist', 'main.js');
             let desktopAppPath = '';
             let desktopDir = '';
-            // Check if we're in development environment
-            if (fs.existsSync(devWorkspacePath) && fs.existsSync(devMainPath)) {
-                desktopAppPath = devMainPath;
-                desktopDir = devWorkspacePath;
-                console.log('💡 Using GitSwitch development workspace');
-            }
-            else {
-                // Try other possible locations for production/global install
-                const possiblePaths = [
-                    // Relative to CLI build location (development)
-                    path.resolve(__dirname, '../../desktop/dist/main.js'),
-                    // Global installation paths
-                    path.resolve(__dirname, '../../../desktop/dist/main.js'),
-                    path.resolve(process.cwd(), 'node_modules/gitswitch/desktop/dist/main.js')
-                ];
-                // Find the first existing desktop app path
-                for (const possiblePath of possiblePaths) {
-                    if (fs.existsSync(possiblePath)) {
-                        desktopAppPath = possiblePath;
-                        desktopDir = path.dirname(path.dirname(possiblePath)); // Go up from dist/main.js to desktop/
-                        break;
-                    }
+            // Try possible locations for desktop app (in order of preference)
+            const possiblePaths = [
+                // Development environment - relative to CLI location
+                path.resolve(__dirname, '../../desktop/dist/main.js'),
+                // Development environment - from package root
+                path.resolve(__dirname, '../../../desktop/dist/main.js'),
+                // Global installation paths
+                path.resolve(process.cwd(), 'node_modules/gitswitch/desktop/dist/main.js'),
+                // Alternative global paths
+                path.resolve(__dirname, '../../../../desktop/dist/main.js')
+            ];
+            // Find the first existing desktop app path
+            for (const possiblePath of possiblePaths) {
+                if (fs.existsSync(possiblePath)) {
+                    desktopAppPath = possiblePath;
+                    desktopDir = path.dirname(path.dirname(possiblePath)); // Go up from dist/main.js to desktop/
+                    console.log(`💡 Found desktop app at: ${possiblePath}`);
+                    break;
                 }
             }
             // Check if the desktop app exists
             if (!desktopAppPath || !fs.existsSync(desktopAppPath)) {
                 console.error('❌ Desktop app not found at any of the expected locations.');
                 console.log('🔍 Searched locations:');
-                console.log(`   - Development: ${devMainPath}`);
-                console.log(`   - Relative: ${path.resolve(__dirname, '../../desktop/dist/main.js')}`);
-                console.log(`   - Global: ${path.resolve(__dirname, '../../../desktop/dist/main.js')}`);
+                possiblePaths.forEach((searchPath, index) => {
+                    console.log(`   ${index + 1}. ${searchPath} ${fs.existsSync(searchPath) ? '✅' : '❌'}`);
+                });
                 throw new Error('Desktop app not found. Please run: npm run build:desktop');
             }
             console.log(`📂 Found desktop app at: ${desktopAppPath}`);
             console.log(`📁 Desktop directory: ${desktopDir}`);
             // Use spawn instead of exec for better process control
             const { spawn } = require('child_process');
-            // Use absolute paths and spawn npx directly
-            const args = ['electron', 'dist/main.js', '--project', projectPath];
-            console.log(`🔧 Executing: npx ${args.join(' ')}`);
-            console.log(`📁 Working directory: ${desktopDir}`);
-            // Launch the desktop app using spawn for better control
-            const child = spawn('npx', args, {
-                cwd: desktopDir,
-                detached: true,
-                stdio: ['ignore', 'pipe', 'pipe'],
-                shell: true
-            });
-            // Log output for debugging
-            child.stdout?.on('data', (data) => {
-                console.log(`Desktop app output: ${data}`);
-            });
-            child.stderr?.on('data', (data) => {
-                const message = data.toString();
-                // Ignore GPU process warnings
-                if (!message.includes('GPU process exited') && !message.includes('gpu_process_host')) {
-                    console.error(`Desktop app error: ${message}`);
+            let launchSuccess = false;
+            // Try multiple launch strategies
+            const launchStrategies = [
+                // Strategy 1: Use npx electron (most reliable)
+                {
+                    name: 'npx electron',
+                    command: 'npx',
+                    args: ['electron', 'dist/main.js', '--project', projectPath],
+                    options: { cwd: desktopDir, detached: true, stdio: ['ignore', 'pipe', 'pipe'], shell: true }
+                },
+                // Strategy 2: Try global electron
+                {
+                    name: 'global electron',
+                    command: 'electron',
+                    args: ['dist/main.js', '--project', projectPath],
+                    options: { cwd: desktopDir, detached: true, stdio: ['ignore', 'pipe', 'pipe'], shell: true }
+                },
+                // Strategy 3: Try node with local electron
+                {
+                    name: 'node via npm start',
+                    command: 'npm',
+                    args: ['start', '--', '--project', projectPath],
+                    options: { cwd: desktopDir, detached: true, stdio: ['ignore', 'pipe', 'pipe'], shell: true }
                 }
-            });
-            child.on('error', (error) => {
-                console.error('❌ Failed to spawn desktop app:', error.message);
-                reject(error);
-            });
-            child.on('spawn', () => {
-                console.log('✅ Desktop app process spawned successfully');
-                // Detach the child process so it runs independently
-                child.unref();
-                resolve();
-            });
-            // Fallback timeout
-            setTimeout(() => {
-                console.log('✅ Desktop app launch timeout completed');
-                console.log('💡 If the app doesn\'t appear, check the desktop directory manually');
-                resolve();
-            }, 3000);
+            ];
+            let strategyIndex = 0;
+            const tryNextStrategy = () => {
+                if (strategyIndex >= launchStrategies.length) {
+                    throw new Error('All launch strategies failed');
+                }
+                const strategy = launchStrategies[strategyIndex];
+                console.log(`🔧 Attempting launch strategy ${strategyIndex + 1}: ${strategy.name}`);
+                console.log(`🔧 Executing: ${strategy.command} ${strategy.args.join(' ')}`);
+                console.log(`📁 Working directory: ${desktopDir}`);
+                const child = spawn(strategy.command, strategy.args, strategy.options);
+                // Log output for debugging
+                child.stdout?.on('data', (data) => {
+                    console.log(`Desktop app output: ${data}`);
+                });
+                child.stderr?.on('data', (data) => {
+                    const message = data.toString();
+                    // Ignore GPU process warnings
+                    if (!message.includes('GPU process exited') && !message.includes('gpu_process_host')) {
+                        console.error(`Desktop app error: ${message}`);
+                    }
+                });
+                child.on('error', (error) => {
+                    console.error(`❌ Strategy ${strategyIndex + 1} failed:`, error.message);
+                    strategyIndex++;
+                    if (strategyIndex < launchStrategies.length) {
+                        console.log(`⏭️  Trying next launch strategy...`);
+                        setTimeout(tryNextStrategy, 1000);
+                    }
+                    else {
+                        console.error('❌ All launch strategies failed');
+                        reject(new Error('Could not launch desktop app with any available method'));
+                    }
+                });
+                child.on('spawn', () => {
+                    console.log(`✅ Desktop app launched successfully with strategy: ${strategy.name}`);
+                    launchSuccess = true;
+                    // Detach the child process so it runs independently
+                    child.unref();
+                    resolve();
+                });
+                // Timeout for this strategy
+                setTimeout(() => {
+                    if (!launchSuccess) {
+                        console.log(`⏱️  Strategy ${strategyIndex + 1} timed out, trying next...`);
+                        child.kill();
+                        strategyIndex++;
+                        if (strategyIndex < launchStrategies.length) {
+                            tryNextStrategy();
+                        }
+                        else {
+                            reject(new Error('All launch strategies timed out'));
+                        }
+                    }
+                }, 5000);
+            };
+            // Start with the first strategy
+            tryNextStrategy();
         }
         catch (error) {
             console.error('❌ Failed to launch desktop app:', error.message);
             console.log('💡 Troubleshooting steps:');
             console.log('   1. Run: npm run build:desktop');
-            console.log('   2. Ensure desktop app is built: E:\\GitSwitch\\packages\\desktop\\dist\\main.js');
-            console.log('   3. Try manually: cd E:\\GitSwitch\\packages\\desktop && npm start');
+            console.log('   2. Ensure desktop app is built in dist/ folder');
+            console.log('   3. Install electron globally: npm install -g electron');
+            console.log('   4. Try manual launch: cd packages/desktop && npm start');
+            console.log('   5. Check if Node.js and npm are properly installed');
             reject(error);
         }
     });
