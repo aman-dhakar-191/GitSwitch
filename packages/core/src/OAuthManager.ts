@@ -85,9 +85,9 @@ export class OAuthManager {
         tokenUrl: 'https://github.com/login/oauth/access_token',
         deviceAuthUrl: 'https://github.com/login/device/code',
         userUrl: 'https://api.github.com/user',
-        clientId: 'Iv1.b507a08c87ecfe98', // GitHub CLI's public client ID (supports device flow)
+        clientId: 'Iv1.b507a08c87ecfe98', // GitHub CLI's public client ID 
         scope: ['user:email', 'read:user'],
-        redirectUri: '', // Not needed for device flow
+        redirectUri: 'gitswitch://auth/callback', // Protocol-based redirect
         icon: '🐙'
       },
       gitlab: {
@@ -148,13 +148,52 @@ export class OAuthManager {
       throw new Error(`Unsupported OAuth provider: ${providerName}`);
     }
 
-    // Use device flow for GitHub (more user-friendly, no callback URL needed)
-    if (providerName === 'github' && provider.deviceAuthUrl) {
-      return this.authenticateWithDeviceFlow(provider);
+    // Use protocol-based flow for GitHub (reliable browser redirect)
+    if (providerName === 'github') {
+      return this.authenticateWithProtocolFlow(provider);
     }
 
     // Fallback to traditional OAuth flow for other providers
     return this.authenticateWithTraditionalFlow(provider);
+  }
+
+  /**
+   * GitHub Protocol-Based Authentication (New Approach)
+   */
+  async authenticateWithProtocolFlow(provider: OAuthProvider): Promise<OAuthAccount> {
+    // Check if client ID is configured
+    if (!provider.clientId || provider.clientId.includes('your-')) {
+      throw new Error(`${provider.displayName} OAuth is not configured. Please set up your OAuth app credentials.`);
+    }
+
+    const state = this.generateState(provider.name);
+    const authUrl = this.buildAuthUrl(provider, state);
+
+    return new Promise((resolve, reject) => {
+      // Store promise handlers for callback with 30-minute timeout
+      const timeout = setTimeout(() => {
+        if (this.pendingAuth.has(state)) {
+          this.pendingAuth.delete(state);
+          reject(new Error('Authentication timeout - please try again'));
+        }
+      }, 30 * 60 * 1000); // 30 minutes
+
+      this.pendingAuth.set(state, { 
+        resolve: (account: OAuthAccount) => {
+          clearTimeout(timeout);
+          resolve(account);
+        }, 
+        reject: (error: Error) => {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      });
+
+      // Open browser with OAuth URL - the browser will redirect to gitswitch://auth/callback
+      console.log(`🔐 ${provider.displayName} OAuth Flow started`);
+      console.log(`Opening browser for authentication...`);
+      this.openBrowser(authUrl);
+    });
   }
 
   /**

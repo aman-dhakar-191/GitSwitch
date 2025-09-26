@@ -78,6 +78,8 @@ class GitSwitchApp {
         }
     }
     initializeApp() {
+        // Set up protocol handling for gitswitch:// URLs
+        this.setupProtocolHandling();
         electron_1.app.whenReady().then(() => {
             this.createMainWindow();
             electron_1.app.on('activate', () => {
@@ -110,6 +112,132 @@ class GitSwitchApp {
                 this.mainWindow.show();
             }
         });
+    }
+    setupProtocolHandling() {
+        // Set as default protocol client for gitswitch://
+        if (!electron_1.app.isDefaultProtocolClient('gitswitch')) {
+            electron_1.app.setAsDefaultProtocolClient('gitswitch');
+        }
+        // Handle protocol on macOS
+        electron_1.app.on('open-url', (event, url) => {
+            event.preventDefault();
+            console.log('Protocol URL received (macOS):', url);
+            this.handleProtocolUrl(url);
+        });
+        // Handle protocol on Windows/Linux - second instance
+        electron_1.app.on('second-instance', (event, commandLine, workingDirectory) => {
+            // Someone tried to run a second instance, focus our window instead
+            if (this.mainWindow) {
+                if (this.mainWindow.isMinimized())
+                    this.mainWindow.restore();
+                this.mainWindow.focus();
+            }
+            // Check if there's a protocol URL in the command line
+            const protocolUrl = commandLine.find(arg => arg.startsWith('gitswitch://'));
+            if (protocolUrl) {
+                console.log('Protocol URL received (Windows/Linux):', protocolUrl);
+                this.handleProtocolUrl(protocolUrl);
+            }
+        });
+        // Handle protocol URLs passed as command line arguments on startup
+        if (process.argv.length >= 2) {
+            const protocolUrl = process.argv.find(arg => arg.startsWith('gitswitch://'));
+            if (protocolUrl) {
+                // Delay handling until app is ready
+                electron_1.app.whenReady().then(() => {
+                    setTimeout(() => {
+                        console.log('Protocol URL received (startup):', protocolUrl);
+                        this.handleProtocolUrl(protocolUrl);
+                    }, 1000); // Wait for window to be ready
+                });
+            }
+        }
+        // Prevent multiple instances
+        const gotTheLock = electron_1.app.requestSingleInstanceLock();
+        if (!gotTheLock) {
+            electron_1.app.quit();
+        }
+        console.log('🔗 Protocol handler set up for gitswitch://');
+    }
+    async handleProtocolUrl(url) {
+        try {
+            console.log('Processing protocol URL:', url);
+            const urlObj = new URL(url);
+            const protocol = urlObj.protocol; // 'gitswitch:'
+            const host = urlObj.hostname; // e.g., 'auth'
+            const pathname = urlObj.pathname; // e.g., '/callback'
+            const searchParams = urlObj.searchParams;
+            console.log('Protocol components:', { protocol, host, pathname });
+            if (host === 'auth' && pathname === '/callback') {
+                // Handle OAuth authentication callback
+                const code = searchParams.get('code');
+                const state = searchParams.get('state');
+                const error = searchParams.get('error');
+                const errorDescription = searchParams.get('error_description');
+                // Show and focus the main window
+                if (this.mainWindow) {
+                    this.mainWindow.show();
+                    this.mainWindow.focus();
+                }
+                if (error) {
+                    console.error('OAuth error:', error, errorDescription);
+                    // Notify the renderer process about the error
+                    if (this.mainWindow) {
+                        this.mainWindow.webContents.send('oauth-error', {
+                            error,
+                            description: errorDescription || error
+                        });
+                    }
+                    return;
+                }
+                if (!code || !state) {
+                    console.error('Missing required OAuth parameters:', { code: !!code, state: !!state });
+                    if (this.mainWindow) {
+                        this.mainWindow.webContents.send('oauth-error', {
+                            error: 'invalid_request',
+                            description: 'Missing required OAuth parameters'
+                        });
+                    }
+                    return;
+                }
+                // Determine provider from state (format: provider_randomString)
+                const provider = (state.includes('_') ? state.split('_')[0] : 'github');
+                try {
+                    // Handle the OAuth callback through the OAuthManager
+                    await this.oauthManager.handleOAuthCallback(code, state, provider);
+                    console.log('✅ OAuth authentication completed successfully');
+                    // Notify the renderer process about successful authentication
+                    if (this.mainWindow) {
+                        this.mainWindow.webContents.send('oauth-success', {
+                            provider,
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+                }
+                catch (error) {
+                    console.error('OAuth callback processing failed:', error);
+                    if (this.mainWindow) {
+                        this.mainWindow.webContents.send('oauth-error', {
+                            error: 'processing_failed',
+                            description: error.message || 'Failed to process OAuth callback'
+                        });
+                    }
+                }
+            }
+            else {
+                // Unknown protocol format
+                console.log('Unknown protocol format:', url);
+            }
+        }
+        catch (error) {
+            console.error('Error processing protocol URL:', error);
+            if (this.mainWindow) {
+                this.mainWindow.webContents.send('oauth-error', {
+                    error: 'invalid_url',
+                    description: `Error processing URL: ${error.message}`
+                });
+            }
+        }
     }
     createMainWindow() {
         console.log('🚀 Initializing GitSwitch...');
@@ -850,6 +978,7 @@ class GitSwitchApp {
                             };
                         }
                     case 'START_OAUTH_FLOW':
+                    case 'GITHUB_START_AUTH':
                         try {
                             const account = await this.oauthManager.authenticateWithProvider(ipcEvent.payload.provider);
                             return {
@@ -864,6 +993,7 @@ class GitSwitchApp {
                             };
                         }
                     case 'OAUTH_CALLBACK':
+                    case 'GITHUB_AUTH_COMPLETE':
                         try {
                             await this.oauthManager.handleOAuthCallback(ipcEvent.payload.code, ipcEvent.payload.state, ipcEvent.payload.provider);
                             return {

@@ -1,0 +1,20 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CLASSES_ROOT\gitswitch]
+@="URL:GitSwitch Protocol"
+"URL Protocol"=""
+
+[HKEY_CLASSES_ROOT\gitswitch\DefaultIcon]
+@="\"C:\\Program Files\\GitSwitch\\GitSwitch.exe\",1"
+
+[HKEY_CLASSES_ROOT\gitswitch\shell]
+
+[HKEY_CLASSES_ROOT\gitswitch\shell\open]
+
+[HKEY_CLASSES_ROOT\gitswitch\shell\open\command]
+@="\"C:\\Program Files\\GitSwitch\\GitSwitch.exe\" \"%1\""
+
+; Note: Replace the path with the actual installation path of GitSwitch
+; This file is for manual registration during development
+; The electron-builder will handle this automatically during installation
+; For development testing, update the path to point to your built Electron app

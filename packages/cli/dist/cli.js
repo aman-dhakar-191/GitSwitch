@@ -52,6 +52,50 @@ const pluginManager = new core_1.PluginManager(storageManager, gitManager, proje
 const advancedGitManager = new core_1.AdvancedGitManager(gitManager, securityManager, storageManager);
 const workflowAutomationManager = new core_1.WorkflowAutomationManager(storageManager, gitManager, projectManager, securityManager, advancedGitManager);
 const bulkImportManager = new core_1.BulkImportManager(storageManager, projectScanner, smartDetector, gitManager);
+/**
+ * Helper function to display standardized help text for commands
+ */
+function displayCommandHelp(config) {
+    console.log(`${config.title}`);
+    console.log('');
+    console.log(`${config.description}`);
+    console.log('');
+    if (config.commands && config.commands.length > 0) {
+        console.log('Available commands:');
+        config.commands.forEach(cmd => {
+            const padding = ' '.repeat(Math.max(2, 35 - cmd.command.length));
+            console.log(`  ${cmd.command}${padding}${cmd.description}`);
+        });
+        console.log('');
+    }
+    if (config.options && config.options.length > 0) {
+        console.log('Options:');
+        config.options.forEach(opt => {
+            const padding = ' '.repeat(Math.max(2, 35 - opt.option.length));
+            console.log(`  ${opt.option}${padding}${opt.description}`);
+        });
+        console.log('');
+    }
+    if (config.sections && config.sections.length > 0) {
+        config.sections.forEach(section => {
+            console.log(`${section.title}:`);
+            section.items.forEach(item => {
+                const prefix = item.icon ? `  ${item.icon} ` : '  ';
+                const name = item.name.padEnd(25);
+                console.log(`${prefix}${name}${item.description}`);
+            });
+            console.log('');
+        });
+    }
+    if (config.examples && config.examples.length > 0) {
+        console.log('Examples:');
+        config.examples.forEach(ex => {
+            console.log(`  ${ex.command}`);
+            console.log(`    ${ex.description}`);
+            console.log('');
+        });
+    }
+}
 program
     .name('gitswitch')
     .description('Git identity management tool')
@@ -173,8 +217,48 @@ program
     .argument('[path]', 'path to scan (defaults to current directory)', '.')
     .option('-d, --depth <number>', 'maximum scan depth', '3')
     .option('-i, --import', 'automatically import found projects')
+    .option('-h, --help', 'show detailed help')
     .action(async (scanPath, options) => {
     try {
+        // Show help if requested
+        if (options.help) {
+            displayCommandHelp({
+                title: '🔍 Project Scanner',
+                description: 'Recursively scan directories to discover git repositories and optionally import them into GitSwitch.',
+                options: [
+                    { option: '--depth, -d <number>', description: 'Maximum directory depth to scan (default: 3)' },
+                    { option: '--import, -i', description: 'Automatically import discovered projects' },
+                    { option: '--help, -h', description: 'Show this help message' }
+                ],
+                examples: [
+                    {
+                        command: 'gitswitch scan',
+                        description: 'Scan current directory for git projects (depth: 3)'
+                    },
+                    {
+                        command: 'gitswitch scan ~/dev --depth 2 --import',
+                        description: 'Scan ~/dev directory with depth 2 and auto-import projects'
+                    },
+                    {
+                        command: 'gitswitch scan C:\\Projects --depth 1',
+                        description: 'Scan Windows C:\\Projects directory with depth 1'
+                    }
+                ],
+                sections: [
+                    {
+                        title: 'Scan Results Include',
+                        items: [
+                            { icon: '📁', name: 'Project Name', description: 'Derived from directory name' },
+                            { icon: '📍', name: 'Project Path', description: 'Absolute path to the repository' },
+                            { icon: '🔗', name: 'Remote URL', description: 'Git remote origin URL if available' },
+                            { icon: '🏢', name: 'Organization', description: 'Detected from remote URL (github.com/org)' },
+                            { icon: '⚡', name: 'Performance', description: 'Fast scanning with configurable depth limits' }
+                        ]
+                    }
+                ]
+            });
+            return;
+        }
         console.log(`🔍 Scanning ${path.resolve(scanPath)} for git projects...`);
         const depth = parseInt(options.depth);
         const result = await projectScanner.scanDirectory(path.resolve(scanPath), depth);
@@ -227,8 +311,44 @@ program
     .command('accounts')
     .description('Manage git accounts')
     .option('-l, --list', 'list all accounts')
+    .option('-h, --help', 'show detailed help')
     .action(async (options) => {
     try {
+        // Show help if requested or no options provided
+        if (options.help || (!options.list && Object.keys(options).length === 0)) {
+            displayCommandHelp({
+                title: '👤 Account Management',
+                description: 'Manage git accounts and identities for different projects and repositories.',
+                commands: [
+                    { command: '--list, -l', description: 'List all configured accounts' },
+                    { command: '--help, -h', description: 'Show this help message' }
+                ],
+                examples: [
+                    {
+                        command: 'gitswitch accounts --list',
+                        description: 'Display all configured git accounts with usage statistics'
+                    },
+                    {
+                        command: 'gitswitch .',
+                        description: 'Open desktop app to add, edit, or delete accounts'
+                    }
+                ],
+                sections: [
+                    {
+                        title: 'Account Properties',
+                        items: [
+                            { icon: '📧', name: 'Email', description: 'Git commit email address' },
+                            { icon: '👤', name: 'Name', description: 'Git commit display name' },
+                            { icon: '🏷️', name: 'Description', description: 'Account purpose (Work, Personal, etc.)' },
+                            { icon: '🔑', name: 'SSH Key', description: 'Optional SSH key path for authentication' },
+                            { icon: '🎯', name: 'Patterns', description: 'URL patterns for smart account detection' },
+                            { icon: '📊', name: 'Usage Stats', description: 'Track how often each account is used' }
+                        ]
+                    }
+                ]
+            });
+            return;
+        }
         const accounts = storageManager.getAccounts();
         if (accounts.length === 0) {
             console.log('📋 No accounts configured yet');
@@ -460,8 +580,60 @@ program
     .option('-s, --status', 'show hook status')
     .option('--validation <level>', 'validation level: strict, warning, off', 'strict')
     .option('--auto-fix', 'enable automatic identity fixing')
+    .option('-h, --help', 'show detailed help')
     .action(async (projectPath, options) => {
     try {
+        // Show help if requested
+        if (options.help) {
+            displayCommandHelp({
+                title: '🔗 Git Hooks Management',
+                description: 'Install and manage git hooks that prevent commits with wrong identity. Hooks validate your git config matches the expected account for each project.',
+                commands: [
+                    { command: '--install, -i', description: 'Install pre-commit hooks for identity validation' },
+                    { command: '--remove, -r', description: 'Remove installed git hooks' },
+                    { command: '--status, -s', description: 'Show current hook installation status' },
+                    { command: '--help, -h', description: 'Show this help message' }
+                ],
+                options: [
+                    { option: '--validation <level>', description: 'Validation strictness: strict, warning, off (default: strict)' },
+                    { option: '--auto-fix', description: 'Automatically fix identity when validation fails' }
+                ],
+                examples: [
+                    {
+                        command: 'gitswitch hooks --install',
+                        description: 'Install hooks in current project with strict validation'
+                    },
+                    {
+                        command: 'gitswitch hooks --install --validation warning --auto-fix',
+                        description: 'Install hooks with warning level and auto-fix enabled'
+                    },
+                    {
+                        command: 'gitswitch hooks ~/my-project --status',
+                        description: 'Check hook status for specific project'
+                    }
+                ],
+                sections: [
+                    {
+                        title: 'Validation Levels',
+                        items: [
+                            { icon: '🔒', name: 'strict', description: 'Block commits with wrong identity (recommended)' },
+                            { icon: '⚠️', name: 'warning', description: 'Show warning but allow commits' },
+                            { icon: '📝', name: 'off', description: 'No validation (hooks disabled)' }
+                        ]
+                    },
+                    {
+                        title: 'Hook Features',
+                        items: [
+                            { icon: '✋', name: 'Pre-commit Check', description: 'Validate identity before each commit' },
+                            { icon: '🔧', name: 'Auto-fix', description: 'Automatically set correct identity' },
+                            { icon: '🎯', name: 'Smart Detection', description: 'Use account patterns for validation' },
+                            { icon: '📊', name: 'Analytics', description: 'Track prevented errors and time saved' }
+                        ]
+                    }
+                ]
+            });
+            return;
+        }
         const resolvedPath = path.resolve(projectPath);
         if (!gitManager.isGitRepository(resolvedPath)) {
             console.error('❌ Not a git repository:', resolvedPath);
@@ -1719,14 +1891,14 @@ async function launchDesktopApp(projectPath) {
                 {
                     name: 'npx electron',
                     command: 'npx',
-                    args: ['electron', 'dist/main.js', '--project', projectPath],
+                    args: ['electron', path.join('dist', 'main.js'), '--project', projectPath],
                     options: { cwd: desktopDir, detached: true, stdio: ['ignore', 'pipe', 'pipe'], shell: true }
                 },
                 // Strategy 2: Try global electron
                 {
                     name: 'global electron',
                     command: 'electron',
-                    args: ['dist/main.js', '--project', projectPath],
+                    args: [path.join('dist', 'main.js'), '--project', projectPath],
                     options: { cwd: desktopDir, detached: true, stdio: ['ignore', 'pipe', 'pipe'], shell: true }
                 },
                 // Strategy 3: Try node with local electron
@@ -1799,9 +1971,9 @@ async function launchDesktopApp(projectPath) {
             console.error('❌ Failed to launch desktop app:', error.message);
             console.log('💡 Troubleshooting steps:');
             console.log('   1. Run: npm run build:desktop');
-            console.log('   2. Ensure desktop app is built in dist/ folder');
+            console.log(`   2. Ensure desktop app is built in ${path.join('dist')} folder`);
             console.log('   3. Install electron globally: npm install -g electron');
-            console.log('   4. Try manual launch: cd packages/desktop && npm start');
+            console.log(`   4. Try manual launch: cd ${path.join('packages', 'desktop')} && npm start`);
             console.log('   5. Check if Node.js and npm are properly installed');
             reject(error);
         }
