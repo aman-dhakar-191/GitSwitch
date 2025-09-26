@@ -287,11 +287,11 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       if (provider === 'github') {
         const confirmDialog = window.confirm(
           `GitHub Authentication Process:\n\n` +
-          `✨ We'll use GitHub's secure device flow:\n` +
-          `1. We'll show you a device code\n` +
-          `2. GitHub will open in your browser\n` +
-          `3. Enter the device code on GitHub\n` +
-          `4. Authorize GitSwitch\n\n` +
+          `✨ We'll use GitHub's secure OAuth flow:\n` +
+          `1. We'll open GitHub in your browser\n` +
+          `2. Sign in and authorize GitSwitch\n` +
+          `3. You'll be redirected back to GitSwitch\n` +
+          `4. Your account will be added automatically\n\n` +
           `Ready to start?`
         );
         
@@ -301,30 +301,24 @@ const AccountManager: React.FC<AccountManagerProps> = ({
         }
       }
       
-      // Mock OAuth response for demo
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Use the new protocol-based OAuth flow
+      const response = await window.electronAPI.invoke({
+        type: 'GITHUB_START_AUTH',
+        payload: { provider }
+      });
       
-      const mockAccount: GitAccount = {
-        id: Date.now().toString(),
-        name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
-        email: `user@${provider}.com`,
-        gitName: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
-        description: `Connected via ${provider}`,
-        isDefault: accounts.length === 0,
-        priority: 5,
-        color: provider === 'github' ? '#24292e' : provider === 'gitlab' ? '#fc6d26' : provider === 'bitbucket' ? '#0052cc' : '#0078d4',
-        patterns: [],
-        usageCount: 0,
-        lastUsed: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
+      if (response.success) {
+        // Authentication started successfully
+        console.log('OAuth authentication started for', provider);
+        onAccountAdded(response.data);
+        setShowForm(false);
+      } else {
+        throw new Error(response.error || 'Authentication failed');
+      }
       
-      onAccountAdded(mockAccount);
-      setShowForm(false);
-      
-    } catch (error) {
-      alert('Failed to authenticate: ' + error);
+    } catch (error: any) {
+      console.error('OAuth authentication error:', error);
+      alert('Failed to authenticate: ' + error.message);
     } finally {
       setOauthLoading(null);
     }
@@ -760,7 +754,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
                   }}
                 >
                   <AlertTitle>OAuth Connection</AlertTitle>
-                  Connect your account securely with one-click authentication. No passwords required.
+                  Connect your account securely with OAuth authentication. Your browser will open for secure sign-in.
                 </Alert>
                 
                 <Grid container spacing={2} sx={{ mb: 3 }}>
