@@ -73,6 +73,10 @@
     "forceCodeSigning": false,
     "buildDependenciesFromSource": false,
     "nodeGypRebuild": false,
+    "protocols": {
+      "name": "gitswitch-protocol",
+      "schemes": ["gitswitch"]
+    },
     "directories": {
       "output": "release"
     },

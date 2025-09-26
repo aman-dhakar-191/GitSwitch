@@ -65,6 +65,9 @@ class GitSwitchApp {
   }
 
   private initializeApp(): void {
+    // Set up protocol handling for gitswitch:// URLs
+    this.setupProtocolHandling();
+
     app.whenReady().then(() => {
       this.createMainWindow();
 
@@ -100,6 +103,152 @@ class GitSwitchApp {
         this.mainWindow.show();
       }
     });
+  }
+
+  private setupProtocolHandling(): void {
+    // Set as default protocol client for gitswitch://
+    if (!app.isDefaultProtocolClient('gitswitch')) {
+      app.setAsDefaultProtocolClient('gitswitch');
+    }
+
+    // Handle protocol on macOS
+    app.on('open-url', (event, url) => {
+      event.preventDefault();
+      console.log('Protocol URL received (macOS):', url);
+      this.handleProtocolUrl(url);
+    });
+
+    // Handle protocol on Windows/Linux - second instance
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+      // Someone tried to run a second instance, focus our window instead
+      if (this.mainWindow) {
+        if (this.mainWindow.isMinimized()) this.mainWindow.restore();
+        this.mainWindow.focus();
+      }
+
+      // Check if there's a protocol URL in the command line
+      const protocolUrl = commandLine.find(arg => arg.startsWith('gitswitch://'));
+      if (protocolUrl) {
+        console.log('Protocol URL received (Windows/Linux):', protocolUrl);
+        this.handleProtocolUrl(protocolUrl);
+      }
+    });
+
+    // Handle protocol URLs passed as command line arguments on startup
+    if (process.argv.length >= 2) {
+      const protocolUrl = process.argv.find(arg => arg.startsWith('gitswitch://'));
+      if (protocolUrl) {
+        // Delay handling until app is ready
+        app.whenReady().then(() => {
+          setTimeout(() => {
+            console.log('Protocol URL received (startup):', protocolUrl);
+            this.handleProtocolUrl(protocolUrl);
+          }, 1000); // Wait for window to be ready
+        });
+      }
+    }
+
+    // Prevent multiple instances
+    const gotTheLock = app.requestSingleInstanceLock();
+    if (!gotTheLock) {
+      app.quit();
+    }
+
+    console.log('🔗 Protocol handler set up for gitswitch://');
+  }
+
+  private async handleProtocolUrl(url: string): Promise<void> {
+    try {
+      console.log('Processing protocol URL:', url);
+      
+      const urlObj = new URL(url);
+      const protocol = urlObj.protocol; // 'gitswitch:'
+      const host = urlObj.hostname; // e.g., 'auth'
+      const pathname = urlObj.pathname; // e.g., '/callback'
+      const searchParams = urlObj.searchParams;
+
+      console.log('Protocol components:', { protocol, host, pathname });
+
+      if (host === 'auth' && pathname === '/callback') {
+        // Handle OAuth authentication callback
+        const code = searchParams.get('code');
+        const state = searchParams.get('state');
+        const error = searchParams.get('error');
+        const errorDescription = searchParams.get('error_description');
+
+        // Show and focus the main window
+        if (this.mainWindow) {
+          this.mainWindow.show();
+          this.mainWindow.focus();
+        }
+
+        if (error) {
+          console.error('OAuth error:', error, errorDescription);
+          
+          // Notify the renderer process about the error
+          if (this.mainWindow) {
+            this.mainWindow.webContents.send('oauth-error', {
+              error,
+              description: errorDescription || error
+            });
+          }
+          return;
+        }
+
+        if (!code || !state) {
+          console.error('Missing required OAuth parameters:', { code: !!code, state: !!state });
+          
+          if (this.mainWindow) {
+            this.mainWindow.webContents.send('oauth-error', {
+              error: 'invalid_request',
+              description: 'Missing required OAuth parameters'
+            });
+          }
+          return;
+        }
+
+        // Determine provider from state (format: provider_randomString)
+        const provider = (state.includes('_') ? state.split('_')[0] : 'github') as 'github' | 'gitlab' | 'bitbucket' | 'azure';
+        
+        try {
+          // Handle the OAuth callback through the OAuthManager
+          await this.oauthManager.handleOAuthCallback(code, state, provider);
+          
+          console.log('✅ OAuth authentication completed successfully');
+          
+          // Notify the renderer process about successful authentication
+          if (this.mainWindow) {
+            this.mainWindow.webContents.send('oauth-success', {
+              provider,
+              timestamp: new Date().toISOString()
+            });
+          }
+          
+        } catch (error: any) {
+          console.error('OAuth callback processing failed:', error);
+          
+          if (this.mainWindow) {
+            this.mainWindow.webContents.send('oauth-error', {
+              error: 'processing_failed',
+              description: error.message || 'Failed to process OAuth callback'
+            });
+          }
+        }
+      } else {
+        // Unknown protocol format
+        console.log('Unknown protocol format:', url);
+      }
+
+    } catch (error: any) {
+      console.error('Error processing protocol URL:', error);
+      
+      if (this.mainWindow) {
+        this.mainWindow.webContents.send('oauth-error', {
+          error: 'invalid_url',
+          description: `Error processing URL: ${error.message}`
+        });
+      }
+    }
   }
 
   private createMainWindow(): void {
@@ -934,6 +1083,7 @@ class GitSwitchApp {
             }
 
           case 'START_OAUTH_FLOW':
+          case 'GITHUB_START_AUTH':
             try {
               const account = await this.oauthManager.authenticateWithProvider(ipcEvent.payload.provider);
               return {
@@ -948,6 +1098,7 @@ class GitSwitchApp {
             }
 
           case 'OAUTH_CALLBACK':
+          case 'GITHUB_AUTH_COMPLETE':
             try {
               await this.oauthManager.handleOAuthCallback(
                 ipcEvent.payload.code,
