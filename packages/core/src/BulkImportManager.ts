@@ -112,8 +112,8 @@ export class BulkImportManager {
     if (process.platform === 'win32') {
       const drives = ['C:', 'D:', 'E:'];
       for (const drive of drives) {
-        const devPath = path.join(drive, '\\', 'dev');
-        const projectsPath = path.join(drive, '\\', 'Projects');
+        const devPath = path.join(drive, 'dev');
+        const projectsPath = path.join(drive, 'Projects');
         
         if (fs.existsSync(devPath)) suggestions.push(devPath);
         if (fs.existsSync(projectsPath)) suggestions.push(projectsPath);
