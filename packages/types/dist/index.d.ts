@@ -681,6 +681,17 @@ export type IPCEvent = {
     payload: {
         accountId: string;
     };
+} | {
+    type: 'GITHUB_OAUTH_LOGIN';
+    payload: null;
+} | {
+    type: 'GITHUB_START_REDIRECT_FLOW';
+    payload: null;
+} | {
+    type: 'DELETE_GITHUB_ACCOUNT';
+    payload: {
+        accountId: string;
+    };
 };
 export type IPCResponse<T = any> = {
     success: boolean;

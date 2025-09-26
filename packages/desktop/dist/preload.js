@@ -5,6 +5,19 @@ const electron_1 = require("electron");
 // the ipcRenderer without exposing the entire object
 electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     invoke: (event) => electron_1.ipcRenderer.invoke('api', event),
+    // Event listeners for OAuth callbacks
+    on: (channel, callback) => {
+        const validChannels = ['oauth-success', 'oauth-result'];
+        if (validChannels.includes(channel)) {
+            electron_1.ipcRenderer.on(channel, callback);
+        }
+    },
+    removeListener: (channel, callback) => {
+        const validChannels = ['oauth-success', 'oauth-result'];
+        if (validChannels.includes(channel)) {
+            electron_1.ipcRenderer.removeListener(channel, callback);
+        }
+    },
     // Platform information
     platform: process.platform,
     // App version (could be useful for UI)

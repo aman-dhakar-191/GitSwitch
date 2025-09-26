@@ -85,9 +85,10 @@ export class OAuthManager {
         tokenUrl: 'https://github.com/login/oauth/access_token',
         deviceAuthUrl: 'https://github.com/login/device/code',
         userUrl: 'https://api.github.com/user',
-        clientId: 'Iv1.b507a08c87ecfe98', // GitHub CLI's public client ID (supports device flow)
+        clientId: process.env.GITHUB_CLIENT_ID || 'Iv1.b507a08c87ecfe98', // Default to GitHub CLI's client ID
+        clientSecret: process.env.GITHUB_CLIENT_SECRET,
         scope: ['user:email', 'read:user'],
-        redirectUri: '', // Not needed for device flow
+        redirectUri: 'gitswitch://auth/callback', // Custom protocol redirect URI
         icon: '🐙'
       },
       gitlab: {

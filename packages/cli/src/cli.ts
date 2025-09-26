@@ -328,35 +328,33 @@ program
   .option('-h, --help', 'show detailed help')
   .action(async (options) => {
     try {
-      // Show help if requested or no options provided
-      if (options.help || (!options.list && Object.keys(options).length === 0)) {
+      // Show help if requested 
+      if (options.help) {
         displayCommandHelp({
-          title: '👤 Account Management',
-          description: 'Manage git accounts and identities for different projects and repositories.',
+          title: '👤 GitHub Account Management',
+          description: 'Manage your GitHub accounts for secure git identity management.',
           commands: [
-            { command: '--list, -l', description: 'List all configured accounts' },
+            { command: '--list, -l', description: 'List all connected GitHub accounts' },
             { command: '--help, -h', description: 'Show this help message' }
           ],
           examples: [
             { 
               command: 'gitswitch accounts --list',
-              description: 'Display all configured git accounts with usage statistics'
+              description: 'Display all connected GitHub accounts with usage statistics'
             },
             { 
               command: 'gitswitch .',
-              description: 'Open desktop app to add, edit, or delete accounts'
+              description: 'Open desktop app to connect your GitHub account'
             }
           ],
           sections: [
             {
-              title: 'Account Properties',
+              title: 'GitHub Integration Features',
               items: [
-                { icon: '📧', name: 'Email', description: 'Git commit email address' },
-                { icon: '👤', name: 'Name', description: 'Git commit display name' },
-                { icon: '🏷️', name: 'Description', description: 'Account purpose (Work, Personal, etc.)' },
-                { icon: '🔑', name: 'SSH Key', description: 'Optional SSH key path for authentication' },
-                { icon: '🎯', name: 'Patterns', description: 'URL patterns for smart account detection' },
-                { icon: '📊', name: 'Usage Stats', description: 'Track how often each account is used' }
+                { icon: '�', name: 'Secure Storage', description: 'Tokens stored with system encryption' },
+                { icon: '🤖', name: 'Auto Detection', description: 'Automatically switch identities for GitHub repos' },
+                { icon: '🔄', name: 'Device Flow', description: 'Secure browser-based authentication' },
+                { icon: '📊', name: 'Usage Stats', description: 'Track account usage and activity' }
               ]
             }
           ]
@@ -364,23 +362,39 @@ program
         return;
       }
 
-      const accounts = storageManager.getAccounts();
+      // If no specific options, show the list by default
+      if (!options.list && Object.keys(options).length === 0) {
+        options.list = true;
+      }
+
+      if (options.list) {
+        const accounts = storageManager.getAccounts();
       
-      if (accounts.length === 0) {
-        console.log('📋 No accounts configured yet');
-        console.log('💡 Use the desktop app to add your first account: gitswitch .');
+      // Filter to show only GitHub accounts
+      const githubAccounts = accounts.filter(account => 
+        account.email?.includes('github') || 
+        account.description?.toLowerCase().includes('github') ||
+        (account as any).oauthProvider === 'github'
+      );
+      
+      if (githubAccounts.length === 0) {
+        console.log('📋 No GitHub accounts connected yet');
+        console.log('💡 Use the desktop app to connect your GitHub account: gitswitch .');
+        console.log('🔐 GitHub authentication uses secure device flow - no passwords stored!');
         return;
       }
       
-      console.log(`👤 Found ${accounts.length} account(s):\n`);
+      console.log(`� Found ${githubAccounts.length} GitHub account(s):\n`);
       
-      for (const account of accounts) {
-        console.log(`👤 ${account.name}${account.isDefault ? ' (default)' : ''}`);
+      for (const account of githubAccounts) {
+        const isOAuth = (account as any).oauthProvider === 'github';
+        console.log(`� ${account.name}${account.isDefault ? ' (default)' : ''}`);
         console.log(`   Email: ${account.email}`);
         console.log(`   Git Name: ${account.gitName}`);
         if (account.description) {
           console.log(`   Description: ${account.description}`);
         }
+        console.log(`   Type: ${isOAuth ? 'GitHub OAuth (Secure)' : 'Manual Entry'}`);
         console.log(`   Usage: ${account.usageCount} times`);
         
         // Safely handle lastUsed date formatting
@@ -394,7 +408,24 @@ program
           }
         }
         console.log(`   Last used: ${lastUsedText}`);
+        
+        if (isOAuth) {
+          console.log(`   🔐 Tokens securely stored with system encryption`);
+        }
         console.log('');
+      }
+      
+      // Show additional info about non-GitHub accounts if any exist
+      const otherAccounts = accounts.filter(account => 
+        !(account.email?.includes('github') || 
+          account.description?.toLowerCase().includes('github') ||
+          (account as any).oauthProvider === 'github')
+      );
+      
+        if (otherAccounts.length > 0) {
+          console.log(`\n📝 You also have ${otherAccounts.length} other account(s) configured.`);
+          console.log('💡 Consider connecting your GitHub account for better integration.');
+        }
       }
       
     } catch (error) {

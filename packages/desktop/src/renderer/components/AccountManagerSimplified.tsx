@@ -177,45 +177,80 @@ const AccountManager: React.FC<AccountManagerProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [showGitHubLogin, setShowGitHubLogin] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [deviceCode, setDeviceCode] = useState<string | null>(null);
-  const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
-  const [showDeviceCode, setShowDeviceCode] = useState(false);
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 100);
     return () => clearTimeout(timer);
   }, []);
 
-  // Cleanup polling on unmount
+  // Listen for OAuth results from main process
   useEffect(() => {
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
+    const handleOAuthSuccess = (event: any, account: GitAccount) => {
+      console.log('✅ OAuth success received:', account);
+      setIsConnecting(false);
+      onAccountAdded(account);
+      alert(`Successfully connected GitHub account: ${account.name || account.email}`);
+    };
+
+    const handleOAuthResult = (event: any, result: { success: boolean; message: string }) => {
+      console.log('🔔 OAuth result received:', result);
+      setIsConnecting(false);
+      
+      if (result.success) {
+        alert(`✅ ${result.message}`);
+      } else {
+        alert(`❌ ${result.message}`);
       }
     };
-  }, [pollingInterval]);
+
+    // Register event listeners
+    if ((window as any).electronAPI?.on) {
+      (window as any).electronAPI.on('oauth-success', handleOAuthSuccess);
+      (window as any).electronAPI.on('oauth-result', handleOAuthResult);
+    }
+
+    // Cleanup
+    return () => {
+      if ((window as any).electronAPI?.removeListener) {
+        (window as any).electronAPI.removeListener('oauth-success', handleOAuthSuccess);
+        (window as any).electronAPI.removeListener('oauth-result', handleOAuthResult);
+      }
+    };
+  }, [onAccountAdded]);
 
   const handleGitHubLogin = async () => {
     try {
       setIsConnecting(true);
-      setShowGitHubLogin(false);
       
-      // Start the device flow and get device code
-      const deviceResponse = await (window as any).electronAPI.invoke({
-        type: 'GITHUB_START_DEVICE_FLOW',
+      // Show user the GitHub authentication process
+      const confirmDialog = window.confirm(
+        `GitHub Authentication Process:\n\n` +
+        `🌐 Secure Browser Authentication:\n` +
+        `1. GitHub will open in your browser\n` +
+        `2. Sign in with your GitHub account\n` +
+        `3. Authorize GitSwitch\n` +
+        `4. Return to the app automatically\n\n` +
+        `Your credentials will be stored securely using system encryption.\n\n` +
+        `Ready to start?`
+      );
+      
+      if (!confirmDialog) {
+        setIsConnecting(false);
+        return;
+      }
+
+      // Start the redirect flow
+      const response = await (window as any).electronAPI.invoke({
+        type: 'GITHUB_START_REDIRECT_FLOW',
         payload: null
       });
 
-      if (deviceResponse.success) {
-        setDeviceCode(deviceResponse.data.userCode);
-        setVerificationUrl(deviceResponse.data.verificationUri);
-        setShowDeviceCode(true);
-        
-        // Start polling for token
-        startPollingForToken(deviceResponse.data.deviceCode, deviceResponse.data.userCode);
+      if (response.success) {
+        // Browser opened, user will complete auth there
+        // The app will receive the callback via custom protocol
+        alert('Browser opened for GitHub authentication. Complete the process in your browser.');
       } else {
-        alert(`Failed to start GitHub authentication: ${deviceResponse.error || 'Unknown error'}`);
+        alert(`Failed to start GitHub authentication: ${response.error || 'Unknown error'}`);
         setIsConnecting(false);
       }
       
@@ -223,76 +258,7 @@ const AccountManager: React.FC<AccountManagerProps> = ({
       alert(`Failed to authenticate with GitHub: ${error.message}`);
       setIsConnecting(false);
     }
-  };
-
-  const startPollingForToken = async (deviceCode: string, userCode: string) => {
-    // Clear any existing polling interval
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-    }
-
-    let pollCount = 0;
-    const maxPolls = 180; // 15 minutes with 5 second intervals
-
-    const pollInterval = setInterval(async () => {
-      pollCount++;
-      
-      if (pollCount > maxPolls) {
-        clearInterval(pollInterval);
-        setPollingInterval(null);
-        alert('GitHub authentication timed out. Please try again.');
-        resetAuthState();
-        return;
-      }
-
-      try {
-        const response = await (window as any).electronAPI.invoke({
-          type: 'GITHUB_POLL_DEVICE_TOKEN',
-          payload: { deviceCode, userCode }
-        });
-
-        if (response.success) {
-          // Authentication successful!
-          clearInterval(pollInterval);
-          setPollingInterval(null);
-          onAccountAdded(response.data);
-          resetAuthState();
-        } else if (response.error) {
-          if (response.error === 'authorization_pending') {
-            console.log('⏳ Still waiting for user authorization...');
-            // Continue polling
-          } else if (response.error === 'slow_down') {
-            console.log('🐌 Slowing down polling due to rate limiting...');
-            // Continue polling but the server told us to slow down
-          } else {
-            // Real error - stop polling
-            clearInterval(pollInterval);
-            setPollingInterval(null);
-            alert(`GitHub authentication failed: ${response.error}`);
-            resetAuthState();
-          }
-        }
-        
-      } catch (error: any) {
-        clearInterval(pollInterval);
-        setPollingInterval(null);
-        alert(`Authentication error: ${error.message}`);
-        resetAuthState();
-      }
-    }, 5000); // Poll every 5 seconds
-
-    setPollingInterval(pollInterval);
-  };
-
-  const resetAuthState = () => {
-    setShowDeviceCode(false);
-    setIsConnecting(false);
-    setDeviceCode(null);
-    setVerificationUrl(null);
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      setPollingInterval(null);
-    }
+    // Note: Don't reset isConnecting here - it will be reset when we get the protocol callback
   };
 
   const handleDeleteAccount = async (accountId: string) => {
@@ -662,151 +628,6 @@ const AccountManager: React.FC<AccountManagerProps> = ({
               sx={{ textAlign: 'center', mt: 2 }}
             >
               By connecting, you agree to GitHub's terms of service and allow GitSwitch to manage your git identity for repositories.
-            </Typography>
-          </DialogContent>
-        </GlassDialog>
-
-        {/* Device Code Dialog */}
-        <GlassDialog 
-          open={showDeviceCode} 
-          onClose={() => !isConnecting && setShowDeviceCode(false)}
-          maxWidth="md"
-          fullWidth
-        >
-          <DialogTitle sx={{ pb: 1 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <GitHubIcon sx={{ mr: 2, color: '#24292e' }} />
-                <Typography variant="h3" sx={{ fontWeight: 700 }}>
-                  GitHub Device Authentication
-                </Typography>
-              </Box>
-              <IconButton 
-                onClick={resetAuthState}
-                disabled={false}
-                sx={{ 
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                    transform: 'rotate(90deg)',
-                  },
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                <CloseIcon />
-              </IconButton>
-            </Box>
-          </DialogTitle>
-          
-          <DialogContent dividers sx={{ pt: 2, minHeight: '300px' }}>
-            <Alert 
-              severity="info" 
-              sx={{ 
-                mb: 4,
-                borderRadius: 2,
-                background: 'rgba(33, 150, 243, 0.1)',
-                border: '1px solid rgba(33, 150, 243, 0.2)'
-              }}
-            >
-              <AlertTitle>GitHub will open in your browser</AlertTitle>
-              Follow the steps below to complete authentication. GitHub has been opened in your default browser.
-            </Alert>
-
-            <Box sx={{ textAlign: 'center', mb: 4 }}>
-              <Typography variant="h4" sx={{ mb: 2, fontWeight: 700 }}>
-                Enter this code on GitHub:
-              </Typography>
-              
-              <Box sx={{ 
-                display: 'inline-block',
-                padding: '20px 40px',
-                background: 'linear-gradient(135deg, #24292e 0%, #1a1e22 100%)',
-                borderRadius: 3,
-                border: '2px solid rgba(255, 255, 255, 0.2)',
-                mb: 3
-              }}>
-                <Typography 
-                  variant="h2" 
-                  sx={{ 
-                    fontFamily: 'Monaco, Consolas, monospace',
-                    fontWeight: 700,
-                    letterSpacing: '0.2em',
-                    color: '#fff'
-                  }}
-                >
-                  {deviceCode || '----'}
-                </Typography>
-              </Box>
-
-              <Typography variant="body1" sx={{ mb: 3, color: 'rgba(255, 255, 255, 0.8)' }}>
-                Copy this code and paste it in the GitHub page that just opened
-              </Typography>
-
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <Button 
-                  variant="outlined"
-                  onClick={() => {
-                    if (deviceCode) {
-                      navigator.clipboard.writeText(deviceCode);
-                    }
-                  }}
-                  startIcon={<SecurityIcon />}
-                  sx={{
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.5)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.05)'
-                    }
-                  }}
-                >
-                  Copy Code
-                </Button>
-                
-                <Button 
-                  variant="outlined"
-                  onClick={() => {
-                    if (verificationUrl) {
-                      window.open(verificationUrl, '_blank');
-                    }
-                  }}
-                  startIcon={<GitHubIcon />}
-                  sx={{
-                    borderColor: '#24292e',
-                    color: '#24292e',
-                    '&:hover': {
-                      borderColor: '#1a1e22',
-                      backgroundColor: 'rgba(36, 41, 46, 0.05)'
-                    }
-                  }}
-                >
-                  Open GitHub
-                </Button>
-              </Box>
-            </Box>
-
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              mt: 4,
-              p: 3,
-              backgroundColor: 'rgba(76, 175, 80, 0.1)',
-              borderRadius: 2,
-              border: '1px solid rgba(76, 175, 80, 0.2)'
-            }}>
-              <CircularProgress size={24} sx={{ mr: 2, color: '#4caf50' }} />
-              <Typography variant="body1" sx={{ color: '#4caf50', fontWeight: 600 }}>
-                Waiting for GitHub authorization...
-              </Typography>
-            </Box>
-
-            <Typography 
-              variant="body2" 
-              color="text.secondary" 
-              sx={{ textAlign: 'center', mt: 3 }}
-            >
-              This dialog will automatically close once you authorize GitSwitch on GitHub.
-              The authentication will expire in 15 minutes.
             </Typography>
           </DialogContent>
         </GlassDialog>

@@ -148,6 +148,27 @@ cd packages/cli && npm run dev
 - [x] Smart account suggestions (90%+ accuracy algorithm)
 - [x] Bulk project import (scan 100+ projects in seconds)
 - [x] Enhanced user experience (rich CLI commands)
+
+## 🚧 Upcoming: Stage 4 Advanced Repository Features
+
+### 🔜 In Development
+
+- [ ] **Private Repository Cloning**: Clone private repos with account-specific authentication
+  - `gitswitch clone https://github.com/company/private-repo.git --account work`
+  - Automatic OAuth token and SSH key management
+  - Interactive account selection and progress tracking
+
+- [ ] **Repository Transfer Between Accounts**: Move repos between different GitHub accounts
+  - `gitswitch transfer --from personal --to work ./my-project`
+  - Preserve git history and update remote URLs
+  - Backup and rollback capabilities
+
+- [ ] **Enhanced GitHub Authentication**: Improved OAuth integration
+  - Auto-refresh expired tokens
+  - Repository access validation
+  - Enhanced scopes for private repository management
+
+See [`docs/stage-4-advanced-features.md`](./docs/stage-4-advanced-features.md) for complete specifications.
 - [x] Pattern learning system (automatic improvement)
 - [ ] Git hook integration (prevent wrong commits)
 - [ ] Advanced dashboard UI (analytics visualization)
@@ -241,9 +262,10 @@ $ npm run gitswitch list
 GitSwitch follows a staged development approach. See the development guide and stage-specific documentation:
 
 - [`docs/development-guide.md`](./docs/development-guide.md) - How to use stage-based development
-- [`docs/stage-1-mvp.md`](./docs/stage-1-mvp.md) - Current stage specifications
-- [`docs/stage-2-enhanced.md`](./docs/stage-2-enhanced.md) - Next stage features
-- [`docs/stage-3-advanced.md`](./docs/stage-3-advanced.md) - Advanced features
+- [`docs/stage-1-mvp.md`](./docs/stage-1-mvp.md) - Foundation MVP features ✅
+- [`docs/stage-2-enhanced.md`](./docs/stage-2-enhanced.md) - Enhanced features ✅ 
+- [`docs/stage-3-advanced.md`](./docs/stage-3-advanced.md) - Enterprise features
+- [`docs/stage-4-advanced-features.md`](./docs/stage-4-advanced-features.md) - **NEW:** Repository cloning & transfer features
 
 ### Project Structure
 - `docs/` - All project documentation and development guides

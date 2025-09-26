@@ -323,7 +323,12 @@ export type IPCEvent =
   | { type: 'START_OAUTH_FLOW'; payload: { provider: 'github' | 'gitlab' | 'bitbucket' | 'azure' } }
   | { type: 'OAUTH_CALLBACK'; payload: { code: string; state: string; provider: string } }
   | { type: 'REFRESH_OAUTH_TOKEN'; payload: { accountId: string } }
-  | { type: 'REVOKE_OAUTH_TOKEN'; payload: { accountId: string } };
+  | { type: 'REVOKE_OAUTH_TOKEN'; payload: { accountId: string } }
+  
+  // Simplified GitHub Authentication
+  | { type: 'GITHUB_OAUTH_LOGIN'; payload: null }
+  | { type: 'GITHUB_START_REDIRECT_FLOW'; payload: null }
+  | { type: 'DELETE_GITHUB_ACCOUNT'; payload: { accountId: string } };
 
 export type IPCResponse<T = any> = {
   success: boolean;

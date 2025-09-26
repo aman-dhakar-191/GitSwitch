@@ -6,6 +6,21 @@ import { IPCEvent, IPCResponse } from '@gitswitch/types';
 contextBridge.exposeInMainWorld('electronAPI', {
   invoke: (event: IPCEvent): Promise<IPCResponse> => ipcRenderer.invoke('api', event),
   
+  // Event listeners for OAuth callbacks
+  on: (channel: string, callback: (...args: any[]) => void) => {
+    const validChannels = ['oauth-success', 'oauth-result'];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.on(channel, callback);
+    }
+  },
+  
+  removeListener: (channel: string, callback: (...args: any[]) => void) => {
+    const validChannels = ['oauth-success', 'oauth-result'];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.removeListener(channel, callback);
+    }
+  },
+  
   // Platform information
   platform: process.platform,
   

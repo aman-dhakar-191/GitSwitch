@@ -3,6 +3,7 @@ import * as path from 'path';
 import { GitManager, StorageManager, ProjectManager, SmartDetector, GitHookManager, TeamManager, SecurityManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager, ProjectScanner, OAuthManager } from '@gitswitch/core';
 import { IPCEvent, IPCResponse } from '@gitswitch/types';
 import { SystemTrayManager } from './SystemTrayManager';
+import { WindowManager } from './WindowManager';
 
 // Load environment variables from .env file if it exists
 try {
@@ -13,6 +14,7 @@ try {
 
 class GitSwitchApp {
   private mainWindow: BrowserWindow | null = null;
+  private windowManager: WindowManager;
   private gitManager: GitManager;
   private storageManager: StorageManager;
   private projectManager: ProjectManager;
@@ -29,8 +31,25 @@ class GitSwitchApp {
   private systemTrayManager: SystemTrayManager;
   private hasShownTrayNotification: boolean = false;
   private initialProjectPath: string | null = null;
+  private pendingOAuthState: string | null = null;
 
   constructor() {
+    // Register custom protocol handler for gitswitch://
+    if (!app.isDefaultProtocolClient('gitswitch')) {
+      app.setAsDefaultProtocolClient('gitswitch');
+    }
+
+    // Initialize WindowManager with configuration
+    this.windowManager = WindowManager.getInstance({
+      defaultWidth: 800,
+      defaultHeight: 600,
+      minWidth: 600,
+      minHeight: 400,
+      preventMultipleInstances: true,
+      saveWindowState: true,
+      restoreWindowState: true
+    });
+
     this.gitManager = new GitManager();
     this.storageManager = new StorageManager();
     this.projectManager = new ProjectManager();
@@ -89,15 +108,38 @@ class GitSwitchApp {
     app.on('before-quit', () => {
       console.log('Before Quit');
       (app as any).isQuiting = true;
+      this.windowManager.cleanup();
+    });
+
+    // Handle protocol for OAuth callback on Windows/Linux
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+      // Someone tried to run a second instance, we should focus our window instead
+      // Also check if it's an OAuth callback
+      const url = commandLine.find(arg => arg.startsWith('gitswitch://'));
+      if (url) {
+        this.handleProtocolUrl(url);
+      }
+      
+      // Focus the main window
+      if (this.mainWindow) {
+        if (this.mainWindow.isMinimized()) this.mainWindow.restore();
+        this.mainWindow.focus();
+      }
+    });
+
+    // Handle protocol URLs on macOS
+    app.on('open-url', (event, url) => {
+      event.preventDefault();
+      this.handleProtocolUrl(url);
     });
 
     app.on('activate', () => {
       console.log('Activate');
       // On macOS, re-create window when dock icon is clicked
-      if (BrowserWindow.getAllWindows().length === 0) {
+      if (!this.windowManager.hasOpenWindows()) {
         this.createMainWindow();
-      } else if (this.mainWindow) {
-        this.mainWindow.show();
+      } else {
+        this.windowManager.focusWindow('main');
       }
     });
   }
@@ -105,9 +147,9 @@ class GitSwitchApp {
   private createMainWindow(): void {
     console.log('🚀 Initializing GitSwitch...');
     console.log('[GitSwitchApp] dirname: ',__dirname);
-    this.mainWindow = new BrowserWindow({
-      width: 800,
-      height: 600,
+    
+    // Create window using WindowManager for better management
+    this.mainWindow = this.windowManager.createWindow('main', {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -117,7 +159,8 @@ class GitSwitchApp {
       },
       titleBarStyle: 'default',
       show: false, // Don't show until ready
-      icon: path.join(__dirname, '..', 'assets', 'icons', 'tray-icon.png')
+      icon: path.join(__dirname, '..', 'assets', 'icons', 'tray-icon.png'),
+      title: 'GitSwitch - Git Identity Manager'
     });
 
     // Load the React app
@@ -156,6 +199,8 @@ class GitSwitchApp {
     });
 
     this.mainWindow.on('closed', () => {
+      console.log('🔄 Main window closed');
+      this.windowManager.closeWindow('main');
       this.mainWindow = null;
     });
   }
@@ -164,6 +209,8 @@ class GitSwitchApp {
     // Handle IPC events from renderer process
     ipcMain.handle('api', async (event, ipcEvent: IPCEvent): Promise<IPCResponse> => {
       try {
+        console.log('📨 IPC Event received:', ipcEvent.type, ipcEvent.payload);
+        
         switch (ipcEvent.type) {
           case 'GET_INITIAL_PROJECT':
             // Return the initial project path from CLI
@@ -1009,6 +1056,128 @@ class GitSwitchApp {
               };
             }
 
+          case 'GITHUB_START_REDIRECT_FLOW':
+            try {
+              console.log('🔄 Starting GitHub redirect flow...');
+              
+              // Generate secure state parameter for CSRF protection
+              this.pendingOAuthState = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+              
+              console.log('📊 OAuth Manager:', this.oauthManager);
+              console.log('📊 OAuth Manager providers:', (this.oauthManager as any).providers);
+              
+              const provider = (this.oauthManager as any).providers.github;
+              console.log('📊 GitHub provider:', provider);
+              
+              // Build authorization URL with redirect to custom protocol
+              const authUrl = new URL(provider.authUrl);
+              authUrl.searchParams.set('client_id', provider.clientId);
+              authUrl.searchParams.set('redirect_uri', 'gitswitch://auth/callback');
+              authUrl.searchParams.set('scope', provider.scope);
+              authUrl.searchParams.set('state', this.pendingOAuthState);
+              authUrl.searchParams.set('response_type', 'code');
+              
+              // Open browser to GitHub authorization URL
+              const { shell } = require('electron');
+              await shell.openExternal(authUrl.toString());
+              
+              return {
+                success: true,
+                data: {
+                  message: 'Browser opened for GitHub authorization. Complete the process in your browser.',
+                  authUrl: authUrl.toString()
+                }
+              };
+            } catch (error: any) {
+              console.error('❌ GitHub redirect flow error:', error);
+              console.error('❌ Error stack:', error.stack);
+              return {
+                success: false,
+                error: error.message || 'Failed to start GitHub redirect flow'
+              };
+            }
+
+
+
+          case 'GITHUB_OAUTH_LOGIN':
+            try {
+              const account = await this.oauthManager.authenticateWithProvider('github');
+              
+              // Store the account with secure token storage
+              if (account.oauthToken) {
+                // Encrypt the token using Electron's safeStorage
+                try {
+                  const { safeStorage } = require('electron');
+                  if (safeStorage.isEncryptionAvailable()) {
+                    const encryptedToken = safeStorage.encryptString(account.oauthToken);
+                    (account as any).oauthTokenEncrypted = encryptedToken.toString('base64');
+                    delete (account as any).oauthToken; // Remove plain text token
+                  }
+                } catch (encryptError) {
+                  console.warn('Failed to encrypt token:', encryptError);
+                  // Continue without encryption as fallback
+                }
+              }
+              
+              const savedAccount = this.storageManager.addAccount(account);
+              return {
+                success: true,
+                data: savedAccount
+              };
+            } catch (error: any) {
+              return {
+                success: false,
+                error: error.message || 'GitHub authentication failed'
+              };
+            }
+
+          case 'DELETE_GITHUB_ACCOUNT':
+            try {
+              const accountId = ipcEvent.payload.accountId;
+              const accounts = this.storageManager.getAccounts();
+              const account = accounts.find(a => a.id === accountId) as any;
+              
+              if (!account) {
+                return {
+                  success: false,
+                  error: 'Account not found'
+                };
+              }
+
+              // Revoke the OAuth token if it exists
+              if (account.oauthProvider === 'github' && (account.oauthToken || account.oauthTokenEncrypted)) {
+                try {
+                  // Decrypt token if encrypted
+                  if (account.oauthTokenEncrypted) {
+                    const { safeStorage } = require('electron');
+                    if (safeStorage.isEncryptionAvailable()) {
+                      const encryptedBuffer = Buffer.from(account.oauthTokenEncrypted, 'base64');
+                      account.oauthToken = safeStorage.decryptString(encryptedBuffer);
+                    }
+                  }
+                  
+                  if (account.oauthToken) {
+                    await this.oauthManager.revokeToken(account);
+                  }
+                } catch (revokeError) {
+                  console.warn('Failed to revoke token during deletion:', revokeError);
+                  // Continue with deletion even if revocation fails
+                }
+              }
+
+              // Delete the account
+              const deleteSuccess = this.storageManager.deleteAccount(accountId);
+              return {
+                success: deleteSuccess,
+                data: deleteSuccess
+              };
+            } catch (error: any) {
+              return {
+                success: false,
+                error: error.message || 'Failed to delete GitHub account'
+              };
+            }
+
           default:
             return {
               success: false,
@@ -1016,12 +1185,150 @@ class GitSwitchApp {
             };
         }
       } catch (error: any) {
+        console.error('❌ IPC Handler Error:', error);
+        console.error('❌ Error stack:', error.stack);
         return {
           success: false,
           error: error.message || 'Unknown error occurred'
         };
       }
     });
+  }
+
+  private async handleProtocolUrl(url: string): Promise<void> {
+    console.log('🔗 Protocol URL received:', url);
+    
+    try {
+      const urlObj = new URL(url);
+      
+      if (urlObj.protocol === 'gitswitch:' && urlObj.pathname === '/auth/callback') {
+        const code = urlObj.searchParams.get('code');
+        const state = urlObj.searchParams.get('state');
+        const error = urlObj.searchParams.get('error');
+        
+        if (error) {
+          console.error('❌ OAuth error:', error);
+          this.showOAuthResult(false, `OAuth error: ${error}`);
+          return;
+        }
+        
+        if (!code || !state) {
+          console.error('❌ Missing code or state in OAuth callback');
+          this.showOAuthResult(false, 'Invalid OAuth callback - missing parameters');
+          return;
+        }
+        
+        // Verify state matches what we sent (basic CSRF protection)
+        if (state !== this.pendingOAuthState) {
+          console.error('❌ OAuth state mismatch');
+          this.showOAuthResult(false, 'OAuth state mismatch - possible CSRF attack');
+          return;
+        }
+        
+        console.log('✅ Valid OAuth callback received, exchanging code for token...');
+        
+        // Exchange code for token using existing OAuth manager
+        try {
+          const provider = (this.oauthManager as any).providers.github;
+          
+          // Exchange authorization code for access token
+          const tokenResponse = await this.exchangeCodeForToken(code, provider);
+          
+          // Get user info
+          const userInfo = await (this.oauthManager as any).getUserInfo('github', tokenResponse.access_token);
+          
+          // Create account
+          const account = await (this.oauthManager as any).createAccountFromOAuth('github', tokenResponse, userInfo);
+          
+          // Store the account with secure token storage
+          if (account.oauthToken) {
+            try {
+              const { safeStorage } = require('electron');
+              if (safeStorage.isEncryptionAvailable()) {
+                const encryptedToken = safeStorage.encryptString(account.oauthToken);
+                (account as any).oauthTokenEncrypted = encryptedToken.toString('base64');
+                delete (account as any).oauthToken; // Remove plain text token
+              }
+            } catch (encryptError) {
+              console.warn('Failed to encrypt token:', encryptError);
+            }
+          }
+          
+          const savedAccount = this.storageManager.addAccount(account);
+          console.log(`✅ GitHub account successfully added: ${userInfo.login}`);
+          
+          // Clear pending state
+          this.pendingOAuthState = null;
+          
+          // Show success and notify renderer
+          this.showOAuthResult(true, `Successfully connected GitHub account: ${userInfo.login}`);
+          
+          // Notify renderer process that account was added
+          if (this.mainWindow) {
+            this.mainWindow.webContents.send('oauth-success', savedAccount);
+          }
+          
+        } catch (tokenError: any) {
+          console.error('❌ Failed to exchange OAuth code:', tokenError);
+          this.showOAuthResult(false, `Failed to complete GitHub authentication: ${tokenError.message}`);
+        }
+      }
+    } catch (parseError: any) {
+      console.error('❌ Failed to parse protocol URL:', parseError);
+      this.showOAuthResult(false, 'Invalid protocol URL format');
+    }
+  }
+
+  private async exchangeCodeForToken(code: string, provider: any): Promise<any> {
+    const response = await fetch(provider.tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'User-Agent': 'GitSwitch/1.0',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: provider.clientId,
+        code: code,
+        redirect_uri: 'gitswitch://auth/callback',
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Token exchange failed: ${response.status} ${errorText}`);
+    }
+
+    const responseText = await response.text();
+    try {
+      return JSON.parse(responseText);
+    } catch (parseError) {
+      // Handle URL-encoded response
+      if (responseText.includes('access_token=')) {
+        const urlParams = new URLSearchParams(responseText);
+        return {
+          access_token: urlParams.get('access_token') || '',
+          token_type: urlParams.get('token_type') || 'bearer',
+          scope: urlParams.get('scope') || '',
+        };
+      }
+      throw new Error('Invalid token response format');
+    }
+  }
+
+  private showOAuthResult(success: boolean, message: string): void {
+    // Focus the main window if it exists
+    if (this.mainWindow) {
+      if (this.mainWindow.isMinimized()) this.mainWindow.restore();
+      this.mainWindow.focus();
+      
+      // Send result to renderer
+      this.mainWindow.webContents.send('oauth-result', { success, message });
+    } else {
+      // If no window, show system notification
+      console.log(success ? '✅' : '❌', message);
+    }
   }
 }
 
