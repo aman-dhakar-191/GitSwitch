@@ -237,6 +237,78 @@ projectCmd
     }
   });
 
+// NEW PROJECT IDENTITY COMMANDS
+projectCmd
+  .command('identity')
+  .description('Manage git identity for the current project')
+  .option('--add', 'Add a new identity (same as account login)')
+  .option('--remove', 'Remove identity authentication (same as account logout)')
+  .option('--change', 'Change the git identity for this project')
+  .action(async (options) => {
+    const projectPath = process.cwd();
+
+    // Check if current directory is a git repository
+    if (!gitManager.isGitRepository(projectPath)) {
+      console.error('❌ Current directory is not a git repository');
+      process.exit(1);
+    }
+
+    // If no options provided, show current identity and available actions
+    if (!options.add && !options.remove && !options.change) {
+      const gitConfig = projectManager.getCurrentGitConfig(projectPath);
+      const project = projectManager.analyzeProject(projectPath);
+
+      console.log(`📁 Project: ${project?.name || path.basename(projectPath)}`);
+      console.log(`📍 Path: ${projectPath}`);
+
+      if (gitConfig) {
+        console.log(`👤 Current Git Identity:`);
+        console.log(`   Name: ${gitConfig.name}`);
+        console.log(`   Email: ${gitConfig.email}`);
+      } else {
+        console.log(`⚠️  No git identity configured`);
+      }
+
+      // Ask what the user wants to do
+      const { action } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'action',
+          message: 'What would you like to do?',
+          choices: [
+            { name: 'Add new identity (login to provider)', value: 'add' },
+            { name: 'Change identity for this project', value: 'change' },
+            { name: 'Remove authentication', value: 'remove' },
+            { name: 'Cancel', value: 'cancel' }
+          ]
+        }
+      ]);
+
+      switch (action) {
+        case 'add':
+          await addIdentity();
+          break;
+        case 'change':
+          await changeIdentity(projectPath);
+          break;
+        case 'remove':
+          await removeIdentity();
+          break;
+        case 'cancel':
+          return;
+      }
+    } else {
+      // Handle specific options
+      if (options.add) {
+        await addIdentity();
+      } else if (options.remove) {
+        await removeIdentity();
+      } else if (options.change) {
+        await changeIdentity(projectPath);
+      }
+    }
+  });
+
 // ACCOUNT COMMAND GROUP
 const accountCmd = program
   .command('account')
@@ -560,7 +632,123 @@ hookCmd
     }
   });
 
-// Helper Functions
+// Helper Functions for New Identity Commands
+async function addIdentity() {
+  console.log('➕ Adding new identity (same as account login)...\n');
+  
+  const { provider } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'provider',
+      message: 'Choose authentication provider:',
+      choices: [
+        { name: 'GitHub', value: 'github' },
+        { name: 'GitLab (coming soon)', value: 'gitlab', disabled: true },
+        { name: 'Bitbucket (coming soon)', value: 'bitbucket', disabled: true }
+      ]
+    }
+  ]);
+
+  if (provider === 'github') {
+    await loginWithGitHub();
+  }
+}
+
+async function removeIdentity() {
+  console.log('🗑️  Removing authentication (same as account logout)...\n');
+  
+  const accounts = storageManager.getAccounts();
+  const githubAccounts = accounts.filter(account =>
+    account.oauthProvider === 'github' && account.oauthToken
+  );
+
+  if (githubAccounts.length === 0) {
+    console.log('❌ Not logged in to any providers');
+    return;
+  }
+
+  const { shouldLogout } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'shouldLogout',
+      message: `Logout from ${githubAccounts.length} GitHub account(s)?`,
+      default: false
+    }
+  ]);
+
+  if (shouldLogout) {
+    for (const account of githubAccounts) {
+      const updatedAccount = { ...account };
+      delete updatedAccount.oauthToken;
+      delete updatedAccount.oauthRefreshToken;
+      delete updatedAccount.oauthExpiry;
+
+      storageManager.updateAccount(account.id, updatedAccount);
+    }
+
+    console.log(`✅ Successfully logged out from ${githubAccounts.length} account(s)`);
+  }
+}
+
+async function changeIdentity(projectPath: string) {
+  console.log('🔄 Changing git identity for this project...\n');
+  
+  const accounts = storageManager.getAccounts();
+
+  if (accounts.length === 0) {
+    console.log('❌ No accounts configured');
+    console.log('💡 Run `gitswitch project identity --add` to add an account first');
+    return;
+  }
+
+  const { accountId } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'accountId',
+      message: 'Select account to use for this project:',
+      choices: accounts.map(account => ({
+        name: `${account.name} (${account.email})${account.isDefault ? ' - Default' : ''}`,
+        value: account.id
+      }))
+    }
+  ]);
+
+  const selectedAccount = accounts.find(a => a.id === accountId);
+  
+  if (!selectedAccount) {
+    console.error('❌ Account not found');
+    return;
+  }
+
+  try {
+    // Use gitManager to set the git config for this project
+    const success = gitManager.setConfig(projectPath, {
+      name: selectedAccount.gitName || selectedAccount.name,
+      email: selectedAccount.email
+    });
+
+    if (success) {
+      console.log('\n✅ Git identity changed successfully!');
+      console.log(`👤 Name: ${selectedAccount.gitName || selectedAccount.name}`);
+      console.log(`📧 Email: ${selectedAccount.email}`);
+      console.log(`📁 Project: ${path.basename(projectPath)}`);
+      
+      // Update account usage statistics
+      const updatedAccount = { 
+        ...selectedAccount, 
+        usageCount: (selectedAccount.usageCount || 0) + 1,
+        lastUsed: new Date()
+      };
+      storageManager.updateAccount(accountId, updatedAccount);
+    } else {
+      console.error('❌ Failed to set git config');
+    }
+  } catch (error) {
+    console.error('❌ Error setting git config:', error);
+  }
+}
+
+// Existing Helper Functions
 async function installHooks() {
   const projectPath = process.cwd();
 
