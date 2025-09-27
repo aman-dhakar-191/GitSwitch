@@ -13,8 +13,7 @@ const archiver = require('archiver');
 // Configuration
 const config = {
   paths: {
-    packages: ['packages/types', 'packages/core', 'packages/cli', 'packages/desktop'],
-    desktop: 'packages/desktop',
+    packages: ['packages/types', 'packages/core', 'packages/cli'],
     output: 'build',
     release: 'release'
   },
@@ -47,8 +46,7 @@ gulp.task('clean', async function() {
   const dirsToClean = [
     'build',
     'release',
-    'packages/*/dist',
-    'packages/desktop/release'
+    'packages/*/dist'
   ];
   
   try {
@@ -75,9 +73,6 @@ gulp.task('build:packages', async function() {
     // Build CLI (depends on core and types)
     await execNpm('npm run build', path.join(__dirname, 'packages/cli'));
     
-    // Build desktop main process
-    await execNpm('npm run build:main', path.join(__dirname, 'packages/desktop'));
-    
     console.log('✅ All packages built successfully');
   } catch (error) {
     console.error('❌ Package build failed:', error);
@@ -85,41 +80,19 @@ gulp.task('build:packages', async function() {
   }
 });
 
-// Build desktop renderer with minification options
-gulp.task('build:renderer', function() {
-  return new Promise((resolve, reject) => {
-    console.log('🖥️ Building desktop renderer...');
-    
-    const webpackMode = config.options.mangle ? 'production' : 'development';
-    const command = `npx webpack --mode=${webpackMode}`;
-    
-    try {
-      execSync(command, { 
-        stdio: 'inherit', 
-        cwd: path.join(__dirname, 'packages/desktop')
-      });
-      console.log('✅ Desktop renderer built successfully');
-      resolve();
-    } catch (error) {
-      console.error('❌ Desktop renderer build failed:', error);
-      reject(error);
-    }
-  });
-});
-
 // Build with minification/mangling
 gulp.task('build:minified', gulp.series('clean', function(done) {
   config.options.mangle = true;
   console.log('🔧 Building with minification enabled...');
   done();
-}, 'build:packages', 'build:renderer'));
+}, 'build:packages'));
 
 // Build without minification/mangling
 gulp.task('build:unminified', gulp.series('clean', function(done) {
   config.options.mangle = false;
   console.log('🔧 Building without minification...');
   done();
-}, 'build:packages', 'build:renderer'));
+}, 'build:packages'));
 
 // Default build task (with minification)
 gulp.task('build', gulp.series('build:minified'));
@@ -151,44 +124,8 @@ gulp.task('minify:js', function() {
     .pipe(gulp.dest('.'));
 });
 
-// Package desktop application
-gulp.task('package:desktop', async function() {
-  console.log('📱 Packaging desktop application...');
-  
-  try {
-    // First ensure everything is built
-    await execNpm('npm run build', path.join(__dirname, 'packages/desktop'));
-    
-    // Run the manual packaging script
-    await execNpm('node create-package.js', path.join(__dirname, 'packages/desktop'));
-    
-    console.log('✅ Desktop package created successfully');
-  } catch (error) {
-    console.error('❌ Desktop packaging failed:', error);
-    throw error;
-  }
-});
-
-// Create installer/setup files
-gulp.task('setup', async function() {
-  console.log('📦 Creating setup/installer files...');
-  
-  try {
-    // First package the desktop app
-    await execNpm('node create-package.js', path.join(__dirname, 'packages/desktop'));
-    
-    // Then create the installer
-    await execNpm('node create-installer.js', path.join(__dirname, 'packages/desktop'));
-    
-    console.log('✅ Setup files created successfully');
-  } catch (error) {
-    console.error('❌ Setup creation failed:', error);
-    throw error;
-  }
-});
-
 // Create comprehensive release package
-gulp.task('package', gulp.series('build', 'package:desktop', function(done) {
+gulp.task('package', gulp.series('build', function(done) {
   console.log('📦 Creating comprehensive release package...');
   
   // Ensure release directory exists
@@ -224,7 +161,6 @@ gulp.task('package', gulp.series('build', 'package:desktop', function(done) {
 // Development build (unminified, with sourcemaps)
 gulp.task('dev', gulp.series('build:unminified', function(done) {
   console.log('🚀 Development build completed');
-  console.log('💡 Use "npm run dev" in packages/desktop for live development');
   done();
 }));
 
@@ -239,7 +175,6 @@ gulp.task('watch', function() {
   console.log('👀 Watching for changes...');
   
   gulp.watch('packages/*/src/**/*.ts', gulp.series('build:packages'));
-  gulp.watch('packages/desktop/src/**/*', gulp.series('build:renderer'));
 });
 
 // Helper function to copy directories recursively
