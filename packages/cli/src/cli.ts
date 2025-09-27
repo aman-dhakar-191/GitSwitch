@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
-import { ProjectManager, ProjectScanner, SmartDetector, StorageManager, GitManager, GitHookManager, TeamManager, SecurityManager, ConfigSyncManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager } from '@gitswitch/core';
+import { ProjectManager, ProjectScanner, SmartDetector, StorageManager, GitManager, GitHookManager, TeamManager, SecurityManager, ConfigSyncManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager, OAuthManager } from '@gitswitch/core';
 import { GitHookInstallConfig } from '@gitswitch/types';
 
 const program = new Command();
@@ -21,6 +21,7 @@ const pluginManager = new PluginManager(storageManager, gitManager, projectManag
 const advancedGitManager = new AdvancedGitManager(gitManager, securityManager, storageManager);
 const workflowAutomationManager = new WorkflowAutomationManager(storageManager, gitManager, projectManager, securityManager, advancedGitManager);
 const bulkImportManager = new BulkImportManager(storageManager, projectScanner, smartDetector, gitManager);
+const oauthManager = new OAuthManager(storageManager);
 
 program
   .name('gitswitch')
@@ -63,6 +64,7 @@ program
       // Show available commands
       console.log('\n⚡ Available Commands:');
       console.log('   gitswitch status          Show detailed status');
+      console.log('   gitswitch login           GitHub authentication');
       console.log('   gitswitch accounts        Manage git accounts');
       console.log('   gitswitch list            List all projects');
       console.log('   gitswitch scan            Scan for projects');
@@ -1888,6 +1890,112 @@ program
     }
   });
 
+// GitHub Login Command
+program
+  .command('login')
+  .description('GitHub authentication using device flow')
+  .option('-s, --status', 'show current login status')
+  .option('--logout', 'logout from GitHub')
+  .addHelpText('after', `
+Examples:
+  gitswitch login           Start GitHub authentication
+  gitswitch login --status  Check login status
+  gitswitch login --logout  Logout from GitHub
+  `)
+  .action(async (options) => {
+    try {
+      if (options.status) {
+        // Show current login status
+        console.log('🔐 GitHub Authentication Status\n');
+        
+        const accounts = storageManager.getAccounts();
+        const githubAccounts = accounts.filter(account => 
+          account.oauthProvider === 'github' && account.oauthToken
+        );
+        
+        if (githubAccounts.length === 0) {
+          console.log('❌ Not logged in to GitHub');
+          console.log('💡 Run `gitswitch login` to authenticate with GitHub');
+        } else {
+          console.log(`✅ Logged in to GitHub (${githubAccounts.length} account${githubAccounts.length > 1 ? 's' : ''})\n`);
+          
+          githubAccounts.forEach((account, index) => {
+            console.log(`${index + 1}. ${account.name} (${account.email})`);
+            if (account.avatarUrl) {
+              console.log(`   Profile: ${account.profileUrl || 'N/A'}`);
+            }
+            console.log(`   Added: ${account.createdAt ? new Date(account.createdAt).toLocaleDateString() : 'Unknown'}`);
+            console.log('');
+          });
+        }
+        
+        return;
+      }
+      
+      if (options.logout) {
+        // Logout from GitHub
+        const accounts = storageManager.getAccounts();
+        const githubAccounts = accounts.filter(account => 
+          account.oauthProvider === 'github' && account.oauthToken
+        );
+        
+        if (githubAccounts.length === 0) {
+          console.log('❌ Not logged in to GitHub');
+          return;
+        }
+        
+        console.log('🔓 Logging out from GitHub...\n');
+        
+        for (const account of githubAccounts) {
+          // Remove OAuth token data
+          const updatedAccount = { ...account };
+          delete updatedAccount.oauthToken;
+          delete updatedAccount.oauthRefreshToken;
+          delete updatedAccount.oauthExpiry;
+          
+          storageManager.updateAccount(account.id, updatedAccount);
+        }
+        
+        console.log(`✅ Successfully logged out from ${githubAccounts.length} GitHub account${githubAccounts.length > 1 ? 's' : ''}`);
+        return;
+      }
+      
+      // Start GitHub device flow authentication
+      console.log('🚀 Starting GitHub authentication...\n');
+      
+      try {
+        const account = await oauthManager.authenticateWithProvider('github');
+        
+        console.log('\n🎉 GitHub authentication successful!\n');
+        console.log(`✅ Account: ${account.name} (${account.email})`);
+        console.log(`🔗 Profile: ${account.profileUrl || 'N/A'}`);
+        console.log(`📧 Email verified: ${account.verified ? 'Yes' : 'No'}`);
+        
+        console.log('\n💡 You can now use GitSwitch with your GitHub account!');
+        console.log('   • Your account has been saved securely');
+        console.log('   • Use `gitswitch accounts --list` to see all accounts');
+        console.log('   • Use `gitswitch login --status` to check login status');
+        
+      } catch (error: any) {
+        console.error('\n❌ GitHub authentication failed:', error.message);
+        
+        if (error.message.includes('timeout')) {
+          console.log('\n💡 Authentication timed out. Please try again.');
+        } else if (error.message.includes('not configured')) {
+          console.log('\n💡 GitHub OAuth is not configured.');
+          console.log('   Please check the GitHub OAuth setup documentation.');
+        } else {
+          console.log('\n💡 Please try again or check your internet connection.');
+        }
+        
+        process.exit(1);
+      }
+      
+    } catch (error) {
+      console.error('❌ Login command failed:', error);
+      process.exit(1);
+    }
+  });
 
 
 // Parse CLI arguments
