@@ -325,41 +325,6 @@ accountCmd
     .description('List all configured accounts')
     .action(async () => {
     try {
-        // Show help if requested or no options provided
-        if (options.help || (!options.list && Object.keys(options).length === 0)) {
-            displayCommandHelp({
-                title: '👤 Account Management',
-                description: 'Manage git accounts and identities for different projects and repositories.',
-                commands: [
-                    { command: '--list, -l', description: 'List all configured accounts' },
-                    { command: '--help, -h', description: 'Show this help message' }
-                ],
-                examples: [
-                    {
-                        command: 'gitswitch accounts --list',
-                        description: 'Display all configured git accounts with usage statistics'
-                    },
-                    {
-                        command: 'gitswitch .',
-                        description: 'Open desktop app to add, edit, or delete accounts'
-                    }
-                ],
-                sections: [
-                    {
-                        title: 'Account Properties',
-                        items: [
-                            { icon: '📧', name: 'Email', description: 'Git commit email address' },
-                            { icon: '👤', name: 'Name', description: 'Git commit display name' },
-                            { icon: '🏷️', name: 'Description', description: 'Account purpose (Work, Personal, etc.)' },
-                            { icon: '🔑', name: 'SSH Key', description: 'Optional SSH key path for authentication' },
-                            { icon: '🎯', name: 'Patterns', description: 'URL patterns for smart account detection' },
-                            { icon: '📊', name: 'Usage Stats', description: 'Track how often each account is used' }
-                        ]
-                    }
-                ]
-            });
-            return;
-        }
         const accounts = storageManager.getAccounts();
         if (accounts.length === 0) {
             console.log('📋 No accounts configured yet');
