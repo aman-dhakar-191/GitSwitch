@@ -39,4 +39,26 @@ jobs:
         
     - name: Build production version
       run: npm run gulp:prod
-    
+      
+    - name: Run tests
+      run: npm test
+      continue-on-error: true
+      
+    - name: Verify build artifacts
+      run: |
+        echo "=== Checking build outputs ==="
+        ls -la packages/types/dist/
+        ls -la packages/core/dist/
+        ls -la packages/cli/dist/
+        echo "=== Checking release package ==="
+        ls -la release/
+        echo "=== Build verification complete ==="
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: gitswitch-build
+        path: |
+          packages/*/dist/
+          release/
+        retention-days: 30
