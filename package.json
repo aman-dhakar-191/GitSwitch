@@ -7,15 +7,13 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build:types && npm run build:core && npm run build:cli && npm run build:desktop-main",
+    "build": "npm run build:types && npm run build:core && npm run build:cli",
     "build:types": "cd packages/types && npm run build",
     "build:core": "cd packages/core && npm run build",
     "build:cli": "cd packages/cli && npm run build",
-    "build:desktop-main": "cd packages/desktop && npm run build:main",
-    "build:desktop-renderer": "cd packages/desktop && npm run build:renderer",
-    "build:desktop": "npm run build:desktop-main && npm run build:desktop-renderer",
+
     "build:global": "npm run build && cd packages/gitswitch && npm run build",
-    "package": "npm run build:global && cd packages/desktop && npm run pack",
+    "package": "npm run build:global",
     "test": "npm run test --workspaces",
     "dev": "npm run dev --workspaces",
     "clean": "npm run clean --workspaces",
@@ -28,7 +26,7 @@
     "uninstall-global": "npm uninstall -g gitswitch",
     "verify": "node verify-packages.js",
     "release": "node release.js",
-    "create-installer": "cd packages/desktop && npm run package-full",
+
     "gulp": "gulp",
     "gulp:build": "gulp build",
     "gulp:build:minified": "gulp build:minified",
@@ -59,9 +57,5 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.1",
-    "@mui/material": "^7.3.2"
-  }
+  "dependencies": {}
 }

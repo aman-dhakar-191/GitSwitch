@@ -1,7 +1,7 @@
 /**
  * GitSwitch - Git Identity Management Tool
  * 
- * This package provides both CLI and desktop applications for managing
+ * This package provides CLI application for managing
  * git identities across multiple projects and accounts.
  */
 

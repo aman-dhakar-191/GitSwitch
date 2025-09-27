@@ -306,7 +306,7 @@ elif [ $VALIDATION_EXIT_CODE -eq 1 ]; then
   
   if [ "$VALIDATION_LEVEL" = "strict" ]; then
     echo "❌ Commit blocked due to identity mismatch"
-    echo "💡 Fix with: gitswitch . (open desktop app to switch identity)"
+    echo "💡 Fix with: gitswitch accounts (manage accounts) or gitswitch status (check current identity)"
     exit 1
   elif [ "$VALIDATION_LEVEL" = "warning" ]; then
     echo "⚠️  Warning: Possible identity mismatch - commit allowed"

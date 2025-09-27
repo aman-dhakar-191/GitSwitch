@@ -660,16 +660,9 @@ export type IPCEvent = {
     type: 'GET_OAUTH_PROVIDERS';
     payload: null;
 } | {
-    type: 'GITHUB_START_AUTH';
+    type: 'START_OAUTH_FLOW';
     payload: {
         provider: 'github' | 'gitlab' | 'bitbucket' | 'azure';
-    };
-} | {
-    type: 'GITHUB_AUTH_COMPLETE';
-    payload: {
-        code: string;
-        state: string;
-        provider: string;
     };
 } | {
     type: 'OAUTH_CALLBACK';
@@ -687,11 +680,6 @@ export type IPCEvent = {
     type: 'REVOKE_OAUTH_TOKEN';
     payload: {
         accountId: string;
-    };
-} | {
-    type: 'START_OAUTH_FLOW';
-    payload: {
-        provider: 'github' | 'gitlab' | 'bitbucket' | 'azure';
     };
 };
 export type IPCResponse<T = any> = {

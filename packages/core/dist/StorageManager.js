@@ -53,210 +53,6 @@ class StorageManager {
         this.ensureDataDirectory();
     }
     /**
-     * Validate account data before saving
-     */
-    validateAccount(account) {
-        if (!account.name?.trim()) {
-            throw new Error('Account name is required and cannot be empty');
-        }
-        if (!account.email?.trim()) {
-            throw new Error('Account email is required and cannot be empty');
-        }
-        if (!account.gitName?.trim()) {
-            throw new Error('Git name is required and cannot be empty');
-        }
-        // Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(account.email.trim())) {
-            throw new Error('Invalid email format');
-        }
-        // Check for duplicate emails
-        const existingAccounts = this.getAccounts();
-        const duplicateEmail = existingAccounts.find(a => a.email.toLowerCase() === account.email.toLowerCase());
-        if (duplicateEmail) {
-            throw new Error(`Account with email "${account.email}" already exists`);
-        }
-        // Validate priority range
-        if (account.priority !== undefined && (account.priority < 1 || account.priority > 10)) {
-            throw new Error('Priority must be between 1 and 10');
-        }
-        // Validate SSH key path if provided
-        if (account.sshKeyPath && !path.isAbsolute(account.sshKeyPath)) {
-            throw new Error('SSH key path must be an absolute path');
-        }
-        // Validate patterns array
-        if (account.patterns && !Array.isArray(account.patterns)) {
-            throw new Error('Patterns must be an array');
-        }
-    }
-    /**
-     * Validate account update data
-     */
-    validateAccountUpdate(id, updates) {
-        if (updates.name !== undefined && !updates.name?.trim()) {
-            throw new Error('Account name cannot be empty');
-        }
-        if (updates.email !== undefined) {
-            if (!updates.email?.trim()) {
-                throw new Error('Account email cannot be empty');
-            }
-            // Validate email format
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(updates.email.trim())) {
-                throw new Error('Invalid email format');
-            }
-            // Check for duplicate emails (excluding current account)
-            const existingAccounts = this.getAccounts();
-            const duplicateEmail = existingAccounts.find(a => a.id !== id && a.email.toLowerCase() === updates.email.toLowerCase());
-            if (duplicateEmail) {
-                throw new Error(`Another account with email "${updates.email}" already exists`);
-            }
-        }
-        if (updates.gitName !== undefined && !updates.gitName?.trim()) {
-            throw new Error('Git name cannot be empty');
-        }
-        // Validate priority range
-        if (updates.priority !== undefined && (updates.priority < 1 || updates.priority > 10)) {
-            throw new Error('Priority must be between 1 and 10');
-        }
-        // Validate SSH key path if provided
-        if (updates.sshKeyPath && !path.isAbsolute(updates.sshKeyPath)) {
-            throw new Error('SSH key path must be an absolute path');
-        }
-        // Validate patterns array
-        if (updates.patterns !== undefined && !Array.isArray(updates.patterns)) {
-            throw new Error('Patterns must be an array');
-        }
-    }
-    /**
-     * Validate project data before saving
-     */
-    validateProject(projectData) {
-        if (!projectData.name?.trim()) {
-            throw new Error('Project name is required and cannot be empty');
-        }
-        if (!projectData.path?.trim()) {
-            throw new Error('Project path is required and cannot be empty');
-        }
-        // Validate path is absolute
-        if (!path.isAbsolute(projectData.path)) {
-            throw new Error('Project path must be an absolute path');
-        }
-        // Validate remote URL format if provided
-        if (projectData.remoteUrl && projectData.remoteUrl.trim()) {
-            try {
-                new URL(projectData.remoteUrl);
-            }
-            catch {
-                // Check if it's a valid SSH URL format
-                const sshRegex = /^git@[a-zA-Z0-9.-]+:[a-zA-Z0-9._/-]+\.git$/;
-                if (!sshRegex.test(projectData.remoteUrl)) {
-                    throw new Error('Invalid remote URL format');
-                }
-            }
-        }
-        // Validate platform enum
-        if (projectData.platform && !['github', 'gitlab', 'bitbucket', 'other'].includes(projectData.platform)) {
-            throw new Error('Invalid platform value. Must be github, gitlab, bitbucket, or other');
-        }
-        // Validate status enum
-        if (projectData.status && !['active', 'inactive', 'archived'].includes(projectData.status)) {
-            throw new Error('Invalid status value. Must be active, inactive, or archived');
-        }
-        // Validate tags array
-        if (projectData.tags && !Array.isArray(projectData.tags)) {
-            throw new Error('Tags must be an array');
-        }
-        // Validate confidence range
-        if (projectData.confidence !== undefined && (projectData.confidence < 0 || projectData.confidence > 1)) {
-            throw new Error('Confidence must be between 0 and 1');
-        }
-        // Validate commitCount is non-negative
-        if (projectData.commitCount !== undefined && projectData.commitCount < 0) {
-            throw new Error('Commit count cannot be negative');
-        }
-    }
-    /**
-     * Validate pattern data before saving
-     */
-    validatePattern(pattern) {
-        if (!pattern.name?.trim()) {
-            throw new Error('Pattern name is required and cannot be empty');
-        }
-        if (!pattern.pattern?.trim()) {
-            throw new Error('Pattern is required and cannot be empty');
-        }
-        if (!pattern.accountId?.trim()) {
-            throw new Error('Account ID is required and cannot be empty');
-        }
-        // Validate confidence range
-        if (pattern.confidence !== undefined && (pattern.confidence < 0 || pattern.confidence > 1)) {
-            throw new Error('Confidence must be between 0 and 1');
-        }
-        // Validate createdBy enum
-        if (pattern.createdBy && !['user', 'system'].includes(pattern.createdBy)) {
-            throw new Error('CreatedBy must be either "user" or "system"');
-        }
-        // Validate usageCount is non-negative
-        if (pattern.usageCount !== undefined && pattern.usageCount < 0) {
-            throw new Error('Usage count cannot be negative');
-        }
-        // Check if account exists
-        const accounts = this.getAccounts();
-        const accountExists = accounts.some(a => a.id === pattern.accountId);
-        if (!accountExists) {
-            throw new Error(`Account with ID "${pattern.accountId}" does not exist`);
-        }
-        // Check for duplicate pattern names
-        const existingPatterns = this.getPatterns();
-        const duplicateName = existingPatterns.find(p => p.name.toLowerCase() === pattern.name.toLowerCase());
-        if (duplicateName) {
-            throw new Error(`Pattern with name "${pattern.name}" already exists`);
-        }
-    }
-    /**
-     * Validate pattern update data
-     */
-    validatePatternUpdate(id, updates) {
-        if (updates.name !== undefined && !updates.name?.trim()) {
-            throw new Error('Pattern name cannot be empty');
-        }
-        if (updates.pattern !== undefined && !updates.pattern?.trim()) {
-            throw new Error('Pattern cannot be empty');
-        }
-        if (updates.accountId !== undefined && !updates.accountId?.trim()) {
-            throw new Error('Account ID cannot be empty');
-        }
-        // Validate confidence range
-        if (updates.confidence !== undefined && (updates.confidence < 0 || updates.confidence > 1)) {
-            throw new Error('Confidence must be between 0 and 1');
-        }
-        // Validate createdBy enum
-        if (updates.createdBy !== undefined && !['user', 'system'].includes(updates.createdBy)) {
-            throw new Error('CreatedBy must be either "user" or "system"');
-        }
-        // Validate usageCount is non-negative
-        if (updates.usageCount !== undefined && updates.usageCount < 0) {
-            throw new Error('Usage count cannot be negative');
-        }
-        // Check if account exists (if accountId is being updated)
-        if (updates.accountId !== undefined) {
-            const accounts = this.getAccounts();
-            const accountExists = accounts.some(a => a.id === updates.accountId);
-            if (!accountExists) {
-                throw new Error(`Account with ID "${updates.accountId}" does not exist`);
-            }
-        }
-        // Check for duplicate pattern names (excluding current pattern)
-        if (updates.name !== undefined) {
-            const existingPatterns = this.getPatterns();
-            const duplicateName = existingPatterns.find(p => p.id !== id && p.name.toLowerCase() === updates.name.toLowerCase());
-            if (duplicateName) {
-                throw new Error(`Another pattern with name "${updates.name}" already exists`);
-            }
-        }
-    }
-    /**
      * Get all stored accounts
      */
     getAccounts() {
@@ -297,8 +93,6 @@ class StorageManager {
      * Add a new account
      */
     addAccount(account) {
-        // Validate account data
-        this.validateAccount(account);
         const accounts = this.getAccounts();
         const newAccount = {
             ...account,
@@ -314,8 +108,6 @@ class StorageManager {
      * Update an existing account
      */
     updateAccount(id, updates) {
-        // Validate update data
-        this.validateAccountUpdate(id, updates);
         const accounts = this.getAccounts();
         const index = accounts.findIndex(account => account.id === id);
         if (index === -1) {
@@ -381,8 +173,6 @@ class StorageManager {
      * Add or update a project
      */
     upsertProject(projectData) {
-        // Validate project data
-        this.validateProject(projectData);
         const projects = this.getProjects();
         // Check if project exists by path
         const existingIndex = projects.findIndex(p => p.path === projectData.path);
@@ -521,8 +311,6 @@ class StorageManager {
      * Add a new pattern
      */
     addPattern(pattern) {
-        // Validate pattern data
-        this.validatePattern(pattern);
         const patterns = this.getPatterns();
         const newPattern = {
             ...pattern,
@@ -536,8 +324,6 @@ class StorageManager {
      * Update an existing pattern
      */
     updatePattern(id, updates) {
-        // Validate update data
-        this.validatePatternUpdate(id, updates);
         const patterns = this.getPatterns();
         const index = patterns.findIndex(pattern => pattern.id === id);
         if (index === -1) {
