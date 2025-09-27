@@ -7,9 +7,8 @@
     "gitswitch": "bin/gitswitch"
   },
   "scripts": {
-    "build": "npm run build:cli && npm run build:desktop",
+    "build": "npm run build:cli",
     "build:cli": "cd ../cli && npm run build",
-    "build:desktop": "cd ../desktop && npm run build",
     "test": "echo \"Global package - integration tests would go here\" && exit 0",
     "postinstall": "node scripts/postinstall.js"
   },
@@ -23,8 +22,6 @@
     "identity",
     "management",
     "cli",
-    "desktop",
-    "electron",
     "github",
     "gitlab",
     "account",

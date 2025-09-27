@@ -530,13 +530,25 @@ export class OAuthManager {
   }
 
   private async openBrowser(url: string): Promise<void> {
-    // In Electron environment, we can use shell.openExternal
-    try {
-      const { shell } = require('electron');
-      await shell.openExternal(url);
-    } catch (error) {
-      console.log('Please open this URL in your browser:', url);
+    // Open URL using Node.js child_process
+    const { exec } = require('child_process');
+    const platform = require('os').platform();
+    
+    let command = '';
+    if (platform === 'darwin') {
+      command = `open "${url}"`;
+    } else if (platform === 'win32') {
+      command = `start "" "${url}"`;
+    } else {
+      command = `xdg-open "${url}"`;
     }
+    
+    exec(command, (error: any) => {
+      if (error) {
+        console.error('Failed to open URL:', error);
+        console.log('Please open this URL in your browser:', url);
+      }
+    });
   }
 
   private async exchangeCodeForToken(

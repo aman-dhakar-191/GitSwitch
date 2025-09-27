@@ -10,7 +10,6 @@ GitSwitch solves the common problem of managing multiple git identities across d
 
 ### Core Features
 - **CLI Tool**: Comprehensive project management with `gitswitch scan`, `list`, `accounts`
-- **Desktop App**: Intuitive interface for managing git accounts and projects
 - **Smart Detection**: AI-powered account suggestions based on project context
 - **Auto-Discovery**: Automatic scanning and import of existing projects
 - **Account Management**: Complete CRUD operations with usage analytics
@@ -56,7 +55,7 @@ GitSwitch solves the common problem of managing multiple git identities across d
 
 ```bash
 # Project Management
-gitswitch .                    # Open desktop app for current project
+gitswitch .                    # Show project status and available commands
 gitswitch status              # Show current git identity status
 gitswitch list                # List all managed projects
 gitswitch list --filter api   # Filter projects by name/path
@@ -74,15 +73,7 @@ gitswitch accounts            # List all configured accounts
 gitswitch --help             # Show all commands
 ```
 
-#### Desktop App
 
-The desktop app provides a user-friendly interface for:
-- Managing git accounts (add, edit, delete) with usage analytics
-- Viewing current project context with smart suggestions
-- Switching git identities with confidence scoring
-- Bulk importing and organizing projects
-- Tracking usage patterns and analytics
-- Project-account associations with learning
 
 ## 🏗 Project Structure
 
@@ -90,7 +81,6 @@ The desktop app provides a user-friendly interface for:
 GitSwitch/
 ├── packages/
 │   ├── cli/           # Command-line interface
-│   ├── desktop/       # Electron desktop app
 │   ├── core/          # Shared business logic
 │   └── types/         # TypeScript type definitions
 ├── docs/              # Stage-based documentation
@@ -109,7 +99,7 @@ npm run build
 cd packages/types && npm run build
 cd packages/core && npm run build
 cd packages/cli && npm run build
-cd packages/desktop && npm run build:main
+cd packages/cli && npm run build
 ```
 
 ### Running Tests

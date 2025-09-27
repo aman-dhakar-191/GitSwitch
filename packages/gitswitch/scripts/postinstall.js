@@ -2,7 +2,7 @@
 
 /**
  * GitSwitch Post-Install Setup Script
- * Sets up the global CLI and desktop app integration
+ * Sets up the global CLI integration
  */
 
 const fs = require('fs');

@@ -23,31 +23,24 @@ async function runTests() {
     const statusOutput = execSync('gitswitch status', { encoding: 'utf8' });
     console.log('✅ Status command works');
     
-    // 2. Test desktop app build
-    console.log('\n🖥️  Testing desktop app...');
+    // 2. Test CLI build
+    console.log('\n� Testing CLI build...');
     
-    const desktopPath = path.join(__dirname, 'packages', 'desktop');
-    const distPath = path.join(desktopPath, 'dist');
+    const cliPath = path.join(__dirname, '..', 'packages', 'cli', 'dist');
     
-    if (fs.existsSync(path.join(distPath, 'main.js'))) {
-      console.log('✅ Desktop main process built');
+    if (fs.existsSync(path.join(cliPath, 'cli.js'))) {
+      console.log('✅ CLI built successfully');
     } else {
-      console.log('❌ Desktop main process missing');
-    }
-    
-    if (fs.existsSync(path.join(distPath, 'renderer.js'))) {
-      console.log('✅ Desktop renderer built');
-    } else {
-      console.log('❌ Desktop renderer missing');
+      console.log('❌ CLI build missing');
     }
     
     // 3. Test package integrity
     console.log('\n📦 Testing package integrity...');
     
-    const packages = ['types', 'core', 'cli', 'desktop', 'gitswitch'];
+    const packages = ['types', 'core', 'cli', 'gitswitch'];
     
     for (const pkg of packages) {
-      const pkgPath = path.join(__dirname, 'packages', pkg, 'package.json');
+      const pkgPath = path.join(__dirname, '..', 'packages', pkg, 'package.json');
       if (fs.existsSync(pkgPath)) {
         const pkgJson = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
         console.log(`✅ ${pkg}: v${pkgJson.version}`);
@@ -59,7 +52,7 @@ async function runTests() {
     // 4. Test global binary
     console.log('\n🌐 Testing global binary...');
     
-    const globalBinPath = path.join(__dirname, 'packages', 'gitswitch', 'bin', 'gitswitch');
+    const globalBinPath = path.join(__dirname, '..', 'packages', 'gitswitch', 'bin', 'gitswitch');
     if (fs.existsSync(globalBinPath)) {
       console.log('✅ Global binary exists');
       
@@ -77,7 +70,7 @@ async function runTests() {
     console.log('\n🎉 Package verification completed!');
     console.log('\n📋 Summary:');
     console.log('• CLI commands working ✅');
-    console.log('• Desktop app built ✅');
+    console.log('• CLI build completed ✅');
     console.log('• All packages present ✅');
     console.log('• Global binary ready ✅');
     

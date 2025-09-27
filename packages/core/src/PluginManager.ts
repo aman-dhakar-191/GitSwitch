@@ -678,7 +678,7 @@ module.exports = {
           return undefined;
         },
         showQuickPick: async (items: string[], options?: QuickPickOptions) => {
-          // Would show UI picker in desktop app
+          // CLI-based plugin selection
           return items[0];
         }
       },

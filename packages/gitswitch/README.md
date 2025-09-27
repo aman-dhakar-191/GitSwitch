@@ -39,7 +39,7 @@ gitswitch accounts
 
 ### Project Management
 ```bash
-gitswitch .                    # Open desktop app for current project
+gitswitch .                    # Show project status and available commands
 gitswitch status              # Show current git identity status
 gitswitch list                # List all managed projects
 gitswitch list --filter api   # Filter projects by name/path
@@ -77,7 +77,7 @@ GitSwitch consists of three main components:
 
 - **Core**: Git operations and data management
 - **CLI**: Command-line interface for automation
-- **Desktop**: Electron-based GUI application
+
 
 ## 🔧 Development
 
