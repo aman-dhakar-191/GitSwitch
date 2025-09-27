@@ -19,19 +19,19 @@ This directory contains GitHub Actions workflows for the GitSwitch project.
 
 ### 2. Build and Release Workflow (`build-and-release.yml`)
 **Triggered on:** Push to main/master, Tags (v*), Manual dispatch
-**Purpose:** Build production version and create releases
+**Purpose:** Build production version and upload artifacts
 
 **Features:**
 - 🚀 **Production Build**: Uses `gulp:prod` for optimized, minified build
-- 📦 **Installer Creation**: Uses `gulp:setup` to create Windows installer
+- 🧪 **Testing**: Runs test suite after build
 - 🗄️ **Node Module Caching**: Efficient caching of npm dependencies
 - 📤 **Artifact Upload**: Stores build artifacts for 30 days
-- 🏷️ **Release Creation**: Auto-creates GitHub releases on version tags
+- ✅ **Verification**: Confirms all build outputs are present
 
 **Build Outputs:**
-- `GitSwitch-Setup.zip` (~21MB) - Main application package
-- `Install-GitSwitch.bat` - Windows batch installer
-- `INSTALLATION.md` - Installation instructions
+- `packages/types/dist/` - TypeScript definitions
+- `packages/core/dist/` - Core functionality
+- `packages/cli/dist/` - Command-line interface
 - `release/` - Complete release package
 
 ## Usage
@@ -44,8 +44,8 @@ Push to `main` or create PR → CI workflow runs automatically
 2. Push the tag: `git push origin v1.0.0`
 3. Release workflow will:
    - Build production version
-   - Create installer files
-   - Create GitHub release with attachments
+   - Run tests
+   - Upload build artifacts
 
 ### Manual Trigger
 Go to Actions tab → "Build and Release GitSwitch" → "Run workflow"
@@ -60,27 +60,27 @@ The workflows use efficient caching:
 ## Build Process
 
 1. **Clean**: Remove old build artifacts
-2. **TypeScript Compilation**: Build all packages (types, core, cli, desktop)
-3. **Webpack Bundling**: Bundle desktop renderer with production optimization
-4. **Minification**: Additional JS minification with terser
-5. **Packaging**: Create comprehensive release package
-6. **Installer Creation**: Generate ZIP and Windows installer files
+2. **TypeScript Compilation**: Build all packages (types, core, cli)
+3. **Minification**: JS minification with terser
+4. **Packaging**: Create comprehensive release package
+5. **Testing**: Run test suite to verify functionality
+6. **Verification**: Confirm all outputs are present
 
 ## File Outputs
 
 After successful build:
 ```
-packages/desktop/release/
-├── GitSwitch-Setup.zip        # Main installer (~21MB)
-├── Install-GitSwitch.bat      # Windows installer script  
-├── INSTALLATION.md            # Installation guide
-└── GitSwitch-win-x64/         # Extracted application files
+packages/
+├── types/dist/       # TypeScript definitions
+├── core/dist/        # Core functionality  
+├── cli/dist/         # Command-line interface
+└── gitswitch/        # Global package
 
 release/
-├── types/           # TypeScript definitions
-├── core/            # Core functionality  
-├── cli/             # Command-line interface
-└── gitswitch/       # Global package
+├── types/            # TypeScript definitions
+├── core/             # Core functionality  
+├── cli/              # Command-line interface
+└── gitswitch/        # Global package
 ```
 
 ## Requirements
@@ -89,3 +89,4 @@ release/
 - All dependencies installed via `npm ci`
 - Working gulp build system
 - Valid `package-lock.json` for caching
+- Test suite for verification
