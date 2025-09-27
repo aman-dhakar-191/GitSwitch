@@ -7,6 +7,7 @@
     "gitswitch": "dist/cli.js"
   },
   "scripts": {
+    "start": "node dist/cli.js",
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "jest --passWithNoTests",
@@ -16,8 +17,10 @@
     "@gitswitch/core": "file:../core",
     "@gitswitch/types": "file:../types",
     "@types/blessed": "^0.1.25",
+    "@types/inquirer": "^9.0.7",
     "blessed": "^0.1.81",
-    "commander": "^11.0.0"
+    "commander": "^11.0.0",
+    "inquirer": "^9.2.12"
   },
   "devDependencies": {
     "@types/jest": "^29.0.0",

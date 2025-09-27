@@ -142,7 +142,10 @@ export class OAuthManager {
   /**
    * Start OAuth authentication flow using GitHub Device Flow (no callback URL needed)
    */
-  async authenticateWithProvider(providerName: keyof OAuthConfig): Promise<OAuthAccount> {
+  async authenticateWithProvider(
+    providerName: keyof OAuthConfig,
+    onUserCode?: (userCode: string, verificationUri: string) => Promise<void>
+  ): Promise<OAuthAccount> {
     const provider = this.providers[providerName];
     if (!provider) {
       throw new Error(`Unsupported OAuth provider: ${providerName}`);
@@ -150,7 +153,7 @@ export class OAuthManager {
 
     // Use device flow for GitHub (more user-friendly, no callback URL needed)
     if (providerName === 'github' && provider.deviceAuthUrl) {
-      return this.authenticateWithDeviceFlow(provider);
+      return this.authenticateWithDeviceFlow(provider, onUserCode);
     }
 
     // Fallback to traditional OAuth flow for other providers
@@ -159,46 +162,56 @@ export class OAuthManager {
 
   /**
    * GitHub Device Flow Authentication (Recommended)
+   * @param provider OAuthProvider config
+   * @param onUserCode Optional callback to receive user_code and verification_uri
    */
-  private async authenticateWithDeviceFlow(provider: OAuthProvider): Promise<OAuthAccount> {
+  private async authenticateWithDeviceFlow(
+    provider: OAuthProvider,
+    onUserCode?: (userCode: string, verificationUri: string) => Promise<void>
+  ): Promise<OAuthAccount> {
     try {
       // Step 1: Request device and user codes
       const deviceResponse = await this.requestDeviceCode(provider);
-      
+
       // Step 2: Show user code and open GitHub for authentication
       console.log(`🔐 GitHub Device Flow started`);
       console.log(`User code: ${deviceResponse.user_code}`);
       console.log(`Please visit: ${deviceResponse.verification_uri}`);
-      
+
+      // Callback with user code and verification URI
+      if (onUserCode) {
+        await onUserCode(deviceResponse.user_code, deviceResponse.verification_uri);
+      }
+
       // Show user-friendly dialog with device code
       const message = `GitHub Authentication Started!\n\n` +
-                     `Device Code: ${deviceResponse.user_code}\n\n` +
-                     `Steps:\n` +
-                     `1. GitHub will open in your browser\n` +
-                     `2. Enter the device code: ${deviceResponse.user_code}\n` +
-                     `3. Click "Authorize GitSwitch" on GitHub\n` +
-                     `4. Return to GitSwitch\n\n` +
-                     `The code expires in ${Math.floor(deviceResponse.expires_in / 60)} minutes.`;
-      
+        `Device Code: ${deviceResponse.user_code}\n\n` +
+        `Steps:\n` +
+        `1. GitHub will open in your browser\n` +
+        `2. Enter the device code: ${deviceResponse.user_code}\n` +
+        `3. Click "Authorize GitSwitch" on GitHub\n` +
+        `4. Return to GitSwitch\n\n` +
+        `The code expires in ${Math.floor(deviceResponse.expires_in / 60)} minutes.`;
+
       console.log('\n' + '='.repeat(60));
       console.log(message);
       console.log('='.repeat(60) + '\n');
-      
+
       // Open browser to GitHub's device verification page
       await this.openBrowser(deviceResponse.verification_uri);
-      
+
       // Step 3: Poll for access token
       const tokenResponse = await this.pollForDeviceToken(provider, deviceResponse);
-      
+
       // Step 4: Get user information
       const userInfo = await this.getUserInfo('github', tokenResponse.access_token);
-      
+
       // Step 5: Create GitSwitch account
       const account = await this.createAccountFromOAuth('github', tokenResponse, userInfo);
-      
+
       console.log(`✅ GitHub authentication successful for ${userInfo.login}`);
       return account;
-      
+
     } catch (error) {
       console.error('❌ GitHub Device Flow failed:', error);
       throw error;
@@ -236,9 +249,9 @@ export class OAuthManager {
   private async pollForDeviceToken(provider: OAuthProvider, deviceResponse: DeviceFlowResponse): Promise<OAuthTokenResponse> {
     const pollInterval = Math.max(deviceResponse.interval * 1000, 5000); // Minimum 5 seconds
     const expirationTime = Date.now() + (deviceResponse.expires_in * 1000);
-    
-    console.log(`⏳ Polling for authorization completion every ${pollInterval/1000} seconds...`);
-    
+
+    console.log(`⏳ Polling for authorization completion every ${pollInterval / 1000} seconds...`);
+
     return new Promise((resolve, reject) => {
       const pollTimer = setInterval(async () => {
         try {
@@ -249,7 +262,7 @@ export class OAuthManager {
           }
 
           console.log('🔄 Checking authorization status...');
-          
+
           const response = await fetch(provider.tokenUrl, {
             method: 'POST',
             headers: {
@@ -267,7 +280,7 @@ export class OAuthManager {
           const responseText = await response.text();
           console.log('📡 Poll response status:', response.status);
           console.log('📡 Poll response body:', responseText);
-          
+
           let result: any;
           try {
             result = JSON.parse(responseText);
@@ -321,7 +334,7 @@ export class OAuthManager {
           } else {
             console.log('⚠️ No access token in response, continuing to poll...');
           }
-          
+
         } catch (error) {
           console.error('❌ Error during polling:', error);
           clearInterval(pollTimer);
@@ -377,19 +390,19 @@ export class OAuthManager {
     try {
       // Exchange code for token
       const tokenResponse = await this.exchangeCodeForToken(provider, code);
-      
+
       // Get user information
       const userInfo = await this.getUserInfo(provider, tokenResponse.access_token);
-      
+
       // Create GitSwitch account
       const account = await this.createAccountFromOAuth(provider, tokenResponse, userInfo);
-      
+
       // Resolve the pending promise
       pendingAuth.resolve(account);
       this.pendingAuth.delete(state);
-      
+
       // Keep server running for potential future auth flows
-      
+
     } catch (error) {
       pendingAuth.reject(error);
       this.pendingAuth.delete(state);
@@ -412,7 +425,7 @@ export class OAuthManager {
           pendingAuth.reject(new Error(`OAuth error: ${error_description || error}`));
           this.pendingAuth.delete(state);
         }
-        
+
         res.status(400).send(`
           <html>
             <head><title>GitSwitch - Authentication Error</title></head>
@@ -449,9 +462,9 @@ export class OAuthManager {
       try {
         // Determine provider from state or default to github
         const provider = (state.includes('_') ? state.split('_')[0] : 'github') as keyof OAuthConfig;
-        
+
         await this.handleOAuthCallback(code as string, state as string, provider);
-        
+
         res.send(`
           <html>
             <head><title>GitSwitch - Authentication Successful</title></head>
@@ -473,7 +486,7 @@ export class OAuthManager {
           pendingAuth.reject(error);
           this.pendingAuth.delete(state);
         }
-        
+
         res.status(500).send(`
           <html>
             <head><title>GitSwitch - Authentication Failed</title></head>
@@ -512,8 +525,8 @@ export class OAuthManager {
   }
 
   private generateState(provider?: string): string {
-    const randomId = Math.random().toString(36).substring(2, 15) + 
-                     Math.random().toString(36).substring(2, 15);
+    const randomId = Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15);
     return provider ? `${provider}_${randomId}` : randomId;
   }
 
@@ -533,7 +546,7 @@ export class OAuthManager {
     // Open URL using Node.js child_process
     const { exec } = require('child_process');
     const platform = require('os').platform();
-    
+
     let command = '';
     if (platform === 'darwin') {
       command = `open "${url}"`;
@@ -542,7 +555,7 @@ export class OAuthManager {
     } else {
       command = `xdg-open "${url}"`;
     }
-    
+
     exec(command, (error: any) => {
       if (error) {
         console.error('Failed to open URL:', error);
@@ -552,11 +565,11 @@ export class OAuthManager {
   }
 
   private async exchangeCodeForToken(
-    providerName: keyof OAuthConfig, 
+    providerName: keyof OAuthConfig,
     code: string
   ): Promise<OAuthTokenResponse> {
     const provider = this.providers[providerName];
-    
+
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: provider.clientId,
@@ -582,7 +595,7 @@ export class OAuthManager {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Token exchange error:', errorText);
-      
+
       // Handle specific GitHub errors
       if (errorText.includes('bad_verification_code')) {
         throw new Error('Invalid authorization code. Please try signing in again.');
@@ -613,11 +626,11 @@ export class OAuthManager {
   }
 
   private async getUserInfo(
-    providerName: keyof OAuthConfig, 
+    providerName: keyof OAuthConfig,
     accessToken: string
   ): Promise<OAuthUserInfo> {
     const provider = this.providers[providerName];
-    
+
     const response = await fetch(provider.userUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -633,7 +646,7 @@ export class OAuthManager {
     }
 
     const userData: any = await response.json();
-    
+
     // For GitHub, also fetch email if not public
     if (providerName === 'github' && !(userData as any).email) {
       try {
@@ -644,7 +657,7 @@ export class OAuthManager {
             'User-Agent': 'GitSwitch/1.0',
           },
         });
-        
+
         if (emailResponse.ok) {
           const emails = await emailResponse.json() as any[];
           const primaryEmail = emails.find((email: any) => email.primary);
@@ -657,13 +670,13 @@ export class OAuthManager {
         console.warn('Could not fetch user email:', emailError);
       }
     }
-    
+
     // Normalize user data across different providers
     return this.normalizeUserData(providerName, userData);
   }
 
   private normalizeUserData(
-    providerName: keyof OAuthConfig, 
+    providerName: keyof OAuthConfig,
     userData: any
   ): OAuthUserInfo {
     switch (providerName) {
@@ -677,7 +690,7 @@ export class OAuthManager {
           profileUrl: userData.html_url,
           verified: userData.verified || false,
         };
-      
+
       case 'gitlab':
         return {
           id: userData.id.toString(),
@@ -688,7 +701,7 @@ export class OAuthManager {
           profileUrl: userData.web_url,
           verified: userData.confirmed_at !== null,
         };
-      
+
       case 'bitbucket':
         return {
           id: userData.account_id,
@@ -699,7 +712,7 @@ export class OAuthManager {
           profileUrl: userData.links?.html?.href,
           verified: userData.email_verified || false,
         };
-      
+
       case 'azure':
         return {
           id: userData.id,
@@ -710,7 +723,7 @@ export class OAuthManager {
           profileUrl: userData._links?.self?.href,
           verified: true, // Azure accounts are typically verified
         };
-      
+
       default:
         throw new Error(`Unsupported provider: ${providerName}`);
     }
@@ -722,29 +735,29 @@ export class OAuthManager {
     userInfo: OAuthUserInfo
   ): Promise<OAuthAccount> {
     const provider = this.providers[providerName];
-    
+
     // Use email if available, otherwise use login@github.com as fallback
     const email = userInfo.email || `${userInfo.login}@users.noreply.github.com`;
-    
+
     console.log(`📧 Using email: ${email} (original: ${userInfo.email || 'not provided'})`);
-    
+
     const account: OAuthAccount = {
       id: this.generateAccountId(),
       name: userInfo.name || userInfo.login,
       email: email,
       gitName: userInfo.name || userInfo.login,
       description: `${provider.displayName} Account (${userInfo.login})`,
-      
+
       // OAuth specific fields
       oauthProvider: providerName,
       oauthToken: tokenResponse.access_token,
       oauthRefreshToken: tokenResponse.refresh_token,
-      oauthExpiry: tokenResponse.expires_in ? 
+      oauthExpiry: tokenResponse.expires_in ?
         new Date(Date.now() + tokenResponse.expires_in * 1000) : undefined,
       avatarUrl: userInfo.avatarUrl,
       profileUrl: userInfo.profileUrl,
       verified: userInfo.verified,
-      
+
       // GitSwitch enhanced fields
       sshKeyPath: undefined,
       patterns: this.generateInitialPatterns(providerName, userInfo),
@@ -753,16 +766,16 @@ export class OAuthManager {
       isDefault: false,
       usageCount: 0,
       lastUsed: new Date(),
-      
+
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     // Save the account
     const savedAccount = this.storageManager.addAccount(account) as OAuthAccount;
-    
+
     console.log(`✅ OAuth account created successfully for ${userInfo.login} (${email})`);
-    
+
     return savedAccount;
   }
 
@@ -775,7 +788,7 @@ export class OAuthManager {
     userInfo: OAuthUserInfo
   ): string[] {
     const patterns: string[] = [];
-    
+
     switch (providerName) {
       case 'github':
         patterns.push(`*github.com/${userInfo.login}/*`);
@@ -793,7 +806,7 @@ export class OAuthManager {
         patterns.push(`*visualstudio.com/*`);
         break;
     }
-    
+
     return patterns;
   }
 
@@ -804,7 +817,7 @@ export class OAuthManager {
       bitbucket: '#0052cc',
       azure: '#0078d4',
     };
-    
+
     return colors[providerName] || '#3b82f6';
   }
 
@@ -840,22 +853,22 @@ export class OAuthManager {
       }
 
       const tokenData: OAuthTokenResponse = await response.json() as OAuthTokenResponse;
-      
+
       // Update account with new tokens
       const updatedAccount: OAuthAccount = {
         ...account,
         oauthToken: tokenData.access_token,
         oauthRefreshToken: tokenData.refresh_token || account.oauthRefreshToken,
-        oauthExpiry: tokenData.expires_in ? 
+        oauthExpiry: tokenData.expires_in ?
           new Date(Date.now() + tokenData.expires_in * 1000) : undefined,
         updatedAt: new Date()
       };
 
       // Save updated account
       this.storageManager.updateAccount(updatedAccount.id, updatedAccount);
-      
+
       return updatedAccount;
-      
+
     } catch (error) {
       console.error('Token refresh failed:', error);
       throw error;

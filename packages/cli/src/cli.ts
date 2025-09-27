@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+import inquirer from 'inquirer';
 import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
 import { ProjectManager, ProjectScanner, SmartDetector, StorageManager, GitManager, GitHookManager, TeamManager, SecurityManager, ConfigSyncManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager, OAuthManager } from '@gitswitch/core';
 import { GitHookInstallConfig } from '@gitswitch/types';
-import { BlessedUI } from './ui/blessed-ui';
+import { BlessedUI, BlessedStatusUI } from './ui/blessed-ui';
 
 const program = new Command();
 const gitManager = new GitManager();
@@ -29,1962 +30,966 @@ program
   .description('Git identity management tool')
   .version('1.0.0');
 
+// DOT COMMAND - Interactive UI for current project
 program
   .command('.')
   .description('Open GitSwitch for the current project')
   .action(async () => {
     const projectPath = process.cwd();
-    
+
     try {
-      // Analyze the current project
       const project = projectManager.analyzeProject(projectPath);
-      
+
       if (!project) {
         console.error('❌ Current directory is not a git repository');
         process.exit(1);
       }
 
-      // Get current git config
       const gitConfig = projectManager.getCurrentGitConfig(projectPath);
-
-      // Create and show the blessed UI
       const ui = new BlessedUI({
         project,
         gitConfig: gitConfig || undefined,
         onExit: async () => {
           // Launch the desktop app when user presses Enter
-          await launchDesktopApp(project.path);
         }
       });
-
       ui.render();
-      
+
     } catch (error) {
       console.error('❌ Failed to analyze project:', error);
       process.exit(1);
     }
   });
 
-program
+// PROJECT COMMAND GROUP
+const projectCmd = program
+  .command('project')
+  .description('Project management commands');
+
+projectCmd
   .command('status')
   .description('Show current git identity status')
-  .action(() => {
+  .option('--ui', 'show status with blessed UI interface')
+  .action(async (options) => {
     const projectPath = process.cwd();
-    
+
     try {
       const project = projectManager.analyzeProject(projectPath);
-      
+
       if (!project) {
         console.error('❌ Current directory is not a git repository');
         process.exit(1);
       }
 
       const gitConfig = projectManager.getCurrentGitConfig(projectPath);
-      
-      console.log(`📁 Project: ${project.name}`);
-      console.log(`📍 Path: ${project.path}`);
-      
-      if (project.remoteUrl) {
-        console.log(`🔗 Remote: ${project.remoteUrl}`);
-      }
-      
-      if (gitConfig) {
-        console.log(`👤 Git Identity:`);
-        console.log(`   Name: ${gitConfig.name}`);
-        console.log(`   Email: ${gitConfig.email}`);
+
+      if (options.ui) {
+        const statusUI = new BlessedStatusUI({
+          project,
+          gitConfig: gitConfig || undefined
+        });
+        statusUI.render();
       } else {
-        console.log(`⚠️  No git identity configured`);
+        console.log(`📁 Project: ${project.name}`);
+        console.log(`📍 Path: ${project.path}`);
+
+        if (project.remoteUrl) {
+          console.log(`🔗 Remote: ${project.remoteUrl}`);
+        }
+
+        if (gitConfig) {
+          console.log(`👤 Git Identity:`);
+          console.log(`   Name: ${gitConfig.name}`);
+          console.log(`   Email: ${gitConfig.email}`);
+        } else {
+          console.log(`⚠️  No git identity configured`);
+        }
       }
-      
+
     } catch (error) {
       console.error('❌ Failed to get status:', error);
       process.exit(1);
     }
   });
 
-program
+projectCmd
   .command('list')
   .description('List all managed projects')
-  .option('-f, --filter <pattern>', 'filter projects by name or path')
-  .option('-s, --status <status>', 'filter by status (active|inactive|archived)')
-  .action(async (options) => {
+  .action(async () => {
     try {
       const projects = storageManager.getProjects();
-      
+
+      if (projects.length === 0) {
+        const { shouldScan } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'shouldScan',
+            message: 'No projects found. Would you like to scan for projects now?',
+            default: true
+          }
+        ]);
+
+        if (shouldScan) {
+          // Redirect to scan command
+          await scanProjects();
+        }
+        return;
+      }
+
+      // Interactive project list with filters
+      const { action } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'action',
+          message: 'What would you like to do?',
+          choices: [
+            { name: 'View all projects', value: 'view-all' },
+            { name: 'Filter projects', value: 'filter' },
+            { name: 'Search projects', value: 'search' }
+          ]
+        }
+      ]);
+
       let filteredProjects = projects;
-      
-      // Apply filters
-      if (options.filter) {
-        const filter = options.filter.toLowerCase();
-        filteredProjects = projects.filter(p => 
-          p.name.toLowerCase().includes(filter) || 
+
+      if (action === 'filter') {
+        const { filterType } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'filterType',
+            message: 'Filter by:',
+            choices: [
+              { name: 'Status (active/inactive/archived)', value: 'status' },
+              { name: 'Organization', value: 'org' },
+              { name: 'Account', value: 'account' }
+            ]
+          }
+        ]);
+
+        if (filterType === 'status') {
+          const { status } = await inquirer.prompt([
+            {
+              type: 'list',
+              name: 'status',
+              message: 'Select status:',
+              choices: ['active', 'inactive', 'archived']
+            }
+          ]);
+          filteredProjects = projects.filter(p => p.status === status);
+        }
+      } else if (action === 'search') {
+        const { searchTerm } = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'searchTerm',
+            message: 'Enter search term (name or path):'
+          }
+        ]);
+        const filter = searchTerm.toLowerCase();
+        filteredProjects = projects.filter(p =>
+          p.name.toLowerCase().includes(filter) ||
           p.path.toLowerCase().includes(filter)
         );
       }
-      
-      if (options.status) {
-        filteredProjects = filteredProjects.filter(p => p.status === options.status);
-      }
-      
-      if (filteredProjects.length === 0) {
-        console.log('📋 No projects found matching criteria');
-        return;
-      }
-      
-      console.log(`📋 Found ${filteredProjects.length} project(s):\n`);
-      
-      for (const project of filteredProjects) {
-        const accounts = storageManager.getAccounts();
-        const account = accounts.find(a => a.id === project.accountId);
-        
-        console.log(`📁 ${project.name}`);
-        console.log(`   Path: ${project.path}`);
-        if (project.remoteUrl) {
-          console.log(`   Remote: ${project.remoteUrl}`);
-        }
-        if (account) {
-          console.log(`   Account: ${account.email} (${account.name})`);
-        }
-        console.log(`   Status: ${project.status}`);
-        
-        // Safely handle lastAccessed date formatting
-        let lastAccessedText = 'Unknown';
-        if (project.lastAccessed) {
-          try {
-            const lastAccessedDate = project.lastAccessed instanceof Date ? project.lastAccessed : new Date(project.lastAccessed);
-            lastAccessedText = lastAccessedDate.toLocaleDateString();
-          } catch (error) {
-            lastAccessedText = 'Invalid date';
-          }
-        }
-        console.log(`   Last accessed: ${lastAccessedText}`);
-        console.log('');
-      }
-      
+
+      displayProjects(filteredProjects);
+
     } catch (error) {
       console.error('❌ Failed to list projects:', error);
       process.exit(1);
     }
   });
 
-program
+projectCmd
   .command('scan')
   .description('Scan for git projects in a directory')
-  .argument('[path]', 'path to scan (defaults to current directory)', '.')
-  .option('-d, --depth <number>', 'maximum scan depth', '3')
-  .option('-i, --import', 'automatically import found projects')
-  .action(async (scanPath, options) => {
-    try {
-      console.log(`🔍 Scanning ${path.resolve(scanPath)} for git projects...`);
-      
-      const depth = parseInt(options.depth);
-      const result = await projectScanner.scanDirectory(path.resolve(scanPath), depth);
-      
-      console.log(`✅ Scan completed in ${result.duration}ms`);
-      console.log(`📁 Found ${result.totalFound} git project(s)`);
-      
-      if (result.errors.length > 0) {
-        console.log(`⚠️  ${result.errors.length} error(s) encountered`);
+  .action(async () => {
+    await scanProjects();
+  });
+
+projectCmd
+  .command('import')
+  .description('Import projects from various sources')
+  .action(async () => {
+    const { importType } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'importType',
+        message: 'Choose import method:',
+        choices: [
+          { name: 'Common directories (~/Documents, ~/Projects, etc.)', value: 'common' },
+          { name: 'Bulk import with advanced options', value: 'bulk' },
+          { name: 'Custom path', value: 'custom' }
+        ]
       }
-      
-      if (result.projects.length === 0) {
-        console.log('📋 No git projects found in the specified directory');
-        return;
-      }
-      
-      console.log('\nFound projects:');
-      for (const project of result.projects) {
-        console.log(`  📁 ${project.name}`);
-        console.log(`     Path: ${project.path}`);
-        if (project.remoteUrl) {
-          console.log(`     Remote: ${project.remoteUrl}`);
-        }
-        if (project.organization) {
-          console.log(`     Organization: ${project.organization}`);
-        }
-        console.log('');
-      }
-      
-      if (options.import) {
-        console.log('📥 Importing projects...');
-        
-        for (const project of result.projects) {
-          const existingProjects = storageManager.getProjects();
-          const exists = existingProjects.find(p => p.path === project.path);
-          
-          if (!exists) {
-            storageManager.upsertProject(project);
-            console.log(`  ✅ Imported: ${project.name}`);
-          } else {
-            console.log(`  ⏭️  Skipped: ${project.name} (already exists)`);
-          }
-        }
-        
-        console.log(`✅ Import completed. ${result.projects.length} project(s) processed.`);
-      } else {
-        console.log('\n💡 Use --import flag to automatically add these projects to GitSwitch');
-      }
-      
-    } catch (error) {
-      console.error('❌ Failed to scan directory:', error);
-      process.exit(1);
+    ]);
+
+    switch (importType) {
+      case 'common':
+        await importFromCommon();
+        break;
+      case 'bulk':
+        await bulkImportWithOptions();
+        break;
+      case 'custom':
+        await importFromCustomPath();
+        break;
     }
   });
 
-program
-  .command('accounts')
-  .description('Manage git accounts')
-  .option('-l, --list', 'list all accounts')
-  .action(async (options) => {
+// ACCOUNT COMMAND GROUP
+const accountCmd = program
+  .command('account')
+  .description('Account management commands');
+
+accountCmd
+  .command('list')
+  .description('List all configured accounts')
+  .action(async () => {
     try {
       const accounts = storageManager.getAccounts();
-      
+
       if (accounts.length === 0) {
         console.log('📋 No accounts configured yet');
-        console.log('💡 GitSwitch is CLI-only. Use git config to set up accounts manually.');
+
+        const { shouldLogin } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'shouldLogin',
+            message: 'Would you like to login with GitHub to create an account?',
+            default: true
+          }
+        ]);
+
+        if (shouldLogin) {
+          await loginWithGitHub();
+        }
         return;
       }
-      
-      console.log(`👤 Found ${accounts.length} account(s):\n`);
-      
-      for (const account of accounts) {
-        console.log(`👤 ${account.name}${account.isDefault ? ' (default)' : ''}`);
-        console.log(`   Email: ${account.email}`);
-        console.log(`   Git Name: ${account.gitName}`);
-        if (account.description) {
-          console.log(`   Description: ${account.description}`);
+
+      const { action } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'action',
+          message: 'Account management:',
+          choices: [
+            { name: 'View all accounts', value: 'view' },
+            { name: 'Set default account', value: 'default' },
+            { name: 'Edit account', value: 'edit' },
+            { name: 'Remove account', value: 'remove' }
+          ]
         }
-        console.log(`   Usage: ${account.usageCount} times`);
-        
-        // Safely handle lastUsed date formatting
-        let lastUsedText = 'Never';
-        if (account.lastUsed) {
-          try {
-            const lastUsedDate = account.lastUsed instanceof Date ? account.lastUsed : new Date(account.lastUsed);
-            lastUsedText = lastUsedDate.toLocaleDateString();
-          } catch (error) {
-            lastUsedText = 'Invalid date';
-          }
-        }
-        console.log(`   Last used: ${lastUsedText}`);
-        console.log('');
+      ]);
+
+      switch (action) {
+        case 'view':
+          displayAccounts(accounts);
+          break;
+        case 'default':
+          await setDefaultAccount(accounts);
+          break;
+        case 'edit':
+          await editAccount(accounts);
+          break;
+        case 'remove':
+          await removeAccount(accounts);
+          break;
       }
-      
+
     } catch (error) {
       console.error('❌ Failed to manage accounts:', error);
       process.exit(1);
     }
   });
 
-program
-  .command('import')
-  .description('Import projects from common development tools')
-  .option('--common', 'scan common development directories (default)')
-  .action(async (options) => {
-    try {
-      console.log('📁 Scanning common development directories...');
-      const commonResults = await projectScanner.scanCommonPaths();
-      const importedProjects = commonResults.flatMap(result => result.projects);
-      
-      if (importedProjects.length === 0) {
-        console.log('📋 No projects found in common directories');
-        return;
-      }
-      
-      console.log(`\n📥 Found ${importedProjects.length} project(s) to import...`);
-      
-      let imported = 0;
-      let skipped = 0;
-      
-      for (const project of importedProjects) {
-        const existingProjects = storageManager.getProjects();
-        const exists = existingProjects.find(p => p.path === project.path);
-        
-        if (!exists) {
-          storageManager.upsertProject(project);
-          imported++;
-          console.log(`  ✅ ${project.name}`);
-        } else {
-          skipped++;
-        }
-      }
-      
-      console.log(`\n✅ Import completed!`);
-      console.log(`   Imported: ${imported} projects`);
-      console.log(`   Skipped: ${skipped} projects (already exist)`);
-      
-    } catch (error) {
-      console.error('❌ Failed to import projects:', error);
-      process.exit(1);
-    }
-  });
-
-// Bulk Import Commands
-program
-  .command('bulk-import')
-  .description('Advanced bulk import wizard with intelligent detection')
-  .option('-p, --paths <paths...>', 'specific paths to scan (comma-separated)')
-  .option('--suggested', 'use suggested import paths only')
-  .option('--preview', 'preview import without executing')
-  .option('--generate-patterns', 'automatically generate project patterns')
-  .option('--detect-accounts', 'detect existing accounts from git configs')
-  .option('--skip-existing', 'skip projects that already exist')
-  .option('--max-depth <number>', 'maximum scan depth', '4')
-  .action(async (options) => {
-    try {
-      console.log('🚀 GitSwitch Bulk Import Wizard');
-      console.log('='.repeat(50));
-      
-      // Step 1: Determine scan paths
-      let scanPaths: string[] = [];
-      
-      if (options.paths) {
-        scanPaths = Array.isArray(options.paths) ? options.paths : options.paths.split(',').map((p: string) => p.trim());
-        console.log(`📂 Using specified paths: ${scanPaths.join(', ')}`);
-      } else if (options.suggested) {
-        scanPaths = bulkImportManager.getSuggestedImportPaths();
-        console.log(`💡 Using suggested development paths:`);
-        scanPaths.forEach(path => console.log(`   📂 ${path}`));
-      } else {
-        // Default: common development directories
-        scanPaths = bulkImportManager.getSuggestedImportPaths();
-        console.log(`📂 Scanning common development directories:`);
-        scanPaths.forEach(path => console.log(`   📂 ${path}`));
-      }
-      
-      console.log('');
-      
-      // Build import configuration
-      const importConfig = {
-        sourcePaths: scanPaths,
-        scanDepth: parseInt(options.maxDepth),
-        autoDetectAccounts: Boolean(options.detectAccounts),
-        createMissingAccounts: Boolean(options.detectAccounts),
-        applySmartSuggestions: true,
-        importPatterns: Boolean(options.generatePatterns),
-        excludePatterns: [],
-        includePatterns: [],
-        dryRun: Boolean(options.preview)
-      };
-      
-      if (options.preview) {
-        console.log('👁️  Preview Mode - No changes will be made\n');
-        
-        const preview = await bulkImportManager.previewImport(importConfig);
-        
-        console.log('📊 Import Preview:');
-        const totalFound = preview.scanResults.reduce((sum, result) => sum + result.totalFound, 0);
-        console.log(`   📁 Total projects found: ${totalFound}`);
-        console.log(`   ✅ Projects to import: ${preview.estimatedImports}`);
-        console.log(`   👤 Potential new accounts: ${preview.potentialAccounts.length}`);
-        console.log(`   🎯 Potential patterns: ${preview.potentialPatterns.length}`);
-        console.log('');
-        
-        if (preview.estimatedImports > 0) {
-          console.log('📁 Projects Available for Import:');
-          // Show first few projects from scan results
-          let projectCount = 0;
-          for (const scanResult of preview.scanResults) {
-            for (const project of scanResult.projects.slice(0, 10 - projectCount)) {
-              console.log(`   📁 ${project.name} (${project.path})`);
-              projectCount++;
-              if (projectCount >= 10) break;
-            }
-            if (projectCount >= 10) break;
-          }
-          if (preview.estimatedImports > 10) {
-            console.log(`   ... and ${preview.estimatedImports - 10} more`);
-          }
-          console.log('');
-        }
-        
-        if (preview.potentialAccounts.length > 0) {
-          console.log('👤 Potential New Accounts:');
-          preview.potentialAccounts.forEach((account: any) => {
-            console.log(`   👤 ${account.name} <${account.email}>`);
-          });
-          console.log('');
-        }
-        
-        if (preview.potentialPatterns.length > 0) {
-          console.log('🎯 Potential Patterns:');
-          preview.potentialPatterns.forEach((pattern: any) => {
-            console.log(`   🎯 ${pattern.pattern} → ${pattern.accountId}`);
-          });
-          console.log('');
-        }
-        
-        console.log('💡 Run without --preview to execute the import');
-        return;
-      }
-      
-      // Execute the import
-      console.log('📥 Starting bulk import...');
-      let currentStep = '';
-      
-      const result = await bulkImportManager.executeImport(importConfig, (step: any) => {
-        if (step.name !== currentStep) {
-          currentStep = step.name;
-          console.log(`\n📍 Step ${step.number}/5: ${step.name}`);
-        }
-        console.log(`   ${step.status === 'completed' ? '✅' : '⏳'} ${step.description}`);
-      });
-      
-      console.log('\n🎉 Bulk Import Complete!');
-      console.log('='.repeat(50));
-      console.log(`✅ Successfully imported: ${result.projectsImported} projects`);
-      console.log(`👤 New accounts created: ${result.accountsCreated}`);
-      console.log(`🎯 Patterns generated: ${result.patternsCreated}`);
-      console.log(`⚠️  Errors encountered: ${result.errors.length}`);
-      
-      if (result.errors.length > 0) {
-        console.log('\n❌ Errors:');
-        result.errors.forEach((error: any) => console.log(`   ❌ ${error.message || error}`));
-      }
-      
-      if (result.summary.newProjects.length > 0) {
-        console.log('\n📁 Imported Projects:');
-        result.summary.newProjects.slice(0, 5).forEach((project: any) => {
-          console.log(`   📁 ${project.name}`);
-        });
-        if (result.summary.newProjects.length > 5) {
-          console.log(`   ... and ${result.summary.newProjects.length - 5} more`);
-        }
-      }
-      
-      console.log('\n💡 Use "gitswitch ." to manage your imported projects!');
-      
-    } catch (error) {
-      console.error('❌ Bulk import failed:', error);
-      process.exit(1);
-    }
-  });
-
-program
-  .command('import-paths')
-  .description('Show suggested import paths for bulk import')
+accountCmd
+  .command('login')
+  .description('Login with GitHub or other providers')
   .action(async () => {
-    try {
-      const paths = bulkImportManager.getSuggestedImportPaths();
-      
-      console.log('💡 Suggested Import Paths:');
-      console.log('='.repeat(40));
-      
-      if (paths.length === 0) {
-        console.log('📂 No suggested paths found for your platform');
-        return;
+    const { provider } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'provider',
+        message: 'Choose authentication provider:',
+        choices: [
+          { name: 'GitHub', value: 'github' },
+          { name: 'GitLab (coming soon)', value: 'gitlab', disabled: true },
+          { name: 'Bitbucket (coming soon)', value: 'bitbucket', disabled: true }
+        ]
       }
-      
-      paths.forEach((path: string, index: number) => {
-        const exists = fs.existsSync(path);
-        console.log(`${index + 1}. ${path} ${exists ? '✅' : '❌'}`);
+    ]);
+
+    if (provider === 'github') {
+      await loginWithGitHub();
+    }
+  });
+
+accountCmd
+  .command('logout')
+  .description('Logout from providers')
+  .action(async () => {
+    const accounts = storageManager.getAccounts();
+    const githubAccounts = accounts.filter(account =>
+      account.oauthProvider === 'github' && account.oauthToken
+    );
+
+    if (githubAccounts.length === 0) {
+      console.log('❌ Not logged in to any providers');
+      return;
+    }
+
+    const { shouldLogout } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'shouldLogout',
+        message: `Logout from ${githubAccounts.length} GitHub account(s)?`,
+        default: false
+      }
+    ]);
+
+    if (shouldLogout) {
+      for (const account of githubAccounts) {
+        const updatedAccount = { ...account };
+        delete updatedAccount.oauthToken;
+        delete updatedAccount.oauthRefreshToken;
+        delete updatedAccount.oauthExpiry;
+
+        storageManager.updateAccount(account.id, updatedAccount);
+      }
+
+      console.log(`✅ Successfully logged out from ${githubAccounts.length} account(s)`);
+    }
+  });
+
+accountCmd
+  .command('status')
+  .description('Show authentication status')
+  .action(async () => {
+    console.log('🔐 Authentication Status\n');
+
+    const accounts = storageManager.getAccounts();
+    const githubAccounts = accounts.filter(account =>
+      account.oauthProvider === 'github' && account.oauthToken
+    );
+
+    if (githubAccounts.length === 0) {
+      console.log('❌ Not logged in to GitHub');
+      console.log('💡 Run `gitswitch account login` to authenticate');
+    } else {
+      console.log(`✅ Logged in to GitHub (${githubAccounts.length} account${githubAccounts.length > 1 ? 's' : ''})\n`);
+
+      githubAccounts.forEach((account, index) => {
+        console.log(`${index + 1}. ${account.name} (${account.email})`);
+        if (account.profileUrl) {
+          console.log(`   Profile: ${account.profileUrl}`);
+        }
+        console.log(`   Added: ${account.createdAt ? new Date(account.createdAt).toLocaleDateString() : 'Unknown'}`);
+        console.log('');
       });
-      
-      console.log('\n💡 Use these paths with: gitswitch bulk-import --paths "path1,path2"');
-      
-    } catch (error) {
-      console.error('❌ Failed to get import paths:', error);
+    }
+  });
+
+// HOOK COMMAND GROUP
+const hookCmd = program
+  .command('hook')
+  .description('Git hooks management');
+
+hookCmd
+  .command('install')
+  .description('Install git hooks for identity validation')
+  .action(async () => {
+    const projectPath = process.cwd();
+
+    if (!gitManager.isGitRepository(projectPath)) {
+      console.error('❌ Not a git repository:', projectPath);
+      process.exit(1);
+    }
+
+    const { config } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'validationLevel',
+        message: 'Choose validation level:',
+        choices: [
+          { name: 'Strict - Block commits with wrong identity', value: 'strict' },
+          { name: 'Warning - Show warning but allow commits', value: 'warning' },
+          { name: 'Off - No validation', value: 'off' }
+        ]
+      },
+      {
+        type: 'confirm',
+        name: 'autoFix',
+        message: 'Enable automatic identity fixing?',
+        default: true
+      }
+    ]).then(answers => ({
+      config: {
+        validationLevel: answers.validationLevel,
+        autoFix: answers.autoFix,
+        preCommitEnabled: true
+      } as GitHookInstallConfig
+    }));
+
+    console.log(`🔧 Installing git hooks...`);
+    console.log(`   Validation: ${config.validationLevel}`);
+    console.log(`   Auto-fix: ${config.autoFix ? 'enabled' : 'disabled'}`);
+
+    const success = gitHookManager.installHooks(projectPath, config);
+
+    if (success) {
+      console.log('✅ Git hooks installed successfully!');
+      console.log('💡 Hooks will now validate git identity before each commit');
+    } else {
+      console.error('❌ Failed to install git hooks');
       process.exit(1);
     }
   });
 
-program
-  .command('hooks')
-  .description('Manage git hooks for identity validation')
-  .argument('[path]', 'project path (defaults to current directory)', '.')
-  .option('-i, --install', 'install git hooks')
-  .option('-r, --remove', 'remove git hooks')
-  .option('-s, --status', 'show hook status')
-  .option('--validation <level>', 'validation level: strict, warning, off', 'strict')
-  .option('--auto-fix', 'enable automatic identity fixing')
-  .action(async (projectPath, options) => {
-    try {
-      const resolvedPath = path.resolve(projectPath);
-      
-      if (!gitManager.isGitRepository(resolvedPath)) {
-        console.error('❌ Not a git repository:', resolvedPath);
+hookCmd
+  .command('uninstall')
+  .description('Remove git hooks')
+  .action(async () => {
+    const projectPath = process.cwd();
+
+    if (!gitManager.isGitRepository(projectPath)) {
+      console.error('❌ Not a git repository:', projectPath);
+      process.exit(1);
+    }
+
+    const { shouldRemove } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'shouldRemove',
+        message: 'Are you sure you want to remove git hooks?',
+        default: false
+      }
+    ]);
+
+    if (shouldRemove) {
+      console.log(`🗑️  Removing git hooks...`);
+
+      const success = gitHookManager.removeHooks(projectPath);
+
+      if (success) {
+        console.log('✅ Git hooks removed successfully!');
+      } else {
+        console.error('❌ Failed to remove git hooks');
         process.exit(1);
       }
-      
-      const projectName = path.basename(resolvedPath);
-      
-      if (options.status) {
-        // Show hook status
-        const installed = gitHookManager.areHooksInstalled(resolvedPath);
-        const config = gitHookManager.getHookConfig(resolvedPath);
-        
-        console.log(`📁 Project: ${projectName}`);
-        console.log(`📍 Path: ${resolvedPath}`);
-        console.log(`🔗 Hooks installed: ${installed ? '✅ Yes' : '❌ No'}`);
-        
-        if (config) {
-          console.log(`⚙️  Configuration:`);
-          console.log(`   Validation level: ${config.validationLevel}`);
-          console.log(`   Auto-fix: ${config.autoFix ? 'enabled' : 'disabled'}`);
-          console.log(`   Pre-commit: ${config.preCommitEnabled ? 'enabled' : 'disabled'}`);
-        }
-        
-        return;
-      }
-      
-      if (options.install) {
-        // Install hooks
-        const config: GitHookInstallConfig = {
-          validationLevel: options.validation as 'strict' | 'warning' | 'off',
-          autoFix: Boolean(options.autoFix),
-          preCommitEnabled: true
-        };
-        
-        console.log(`🔧 Installing git hooks for ${projectName}...`);
-        console.log(`   Validation: ${config.validationLevel}`);
-        console.log(`   Auto-fix: ${config.autoFix ? 'enabled' : 'disabled'}`);
-        
-        const success = gitHookManager.installHooks(resolvedPath, config);
-        
-        if (success) {
-          console.log('✅ Git hooks installed successfully!');
-          console.log('💡 Hooks will now validate git identity before each commit');
-        } else {
-          console.error('❌ Failed to install git hooks');
-          process.exit(1);
-        }
-        
-        return;
-      }
-      
-      if (options.remove) {
-        // Remove hooks
-        console.log(`🗑️  Removing git hooks from ${projectName}...`);
-        
-        const success = gitHookManager.removeHooks(resolvedPath);
-        
-        if (success) {
-          console.log('✅ Git hooks removed successfully!');
-        } else {
-          console.error('❌ Failed to remove git hooks');
-          process.exit(1);
-        }
-        
-        return;
-      }
-      
-      // Default: show status
-      const installed = gitHookManager.areHooksInstalled(resolvedPath);
-      console.log(`📁 Project: ${projectName}`);
-      console.log(`🔗 Hooks: ${installed ? '✅ Installed' : '❌ Not installed'}`);
-      console.log('\n💡 Use --install to install hooks or --help for more options');
-      
-    } catch (error) {
-      console.error('❌ Failed to manage git hooks:', error);
-      process.exit(1);
     }
   });
 
-program
-  .command('validate-commit')
-  .description('Validate git identity for commit (used by pre-commit hook)')
-  .argument('<path>', 'project path to validate')
-  .action(async (projectPath) => {
+hookCmd
+  .command('status')
+  .description('Show git hooks status')
+  .action(async () => {
+    const projectPath = process.cwd();
+
+    if (!gitManager.isGitRepository(projectPath)) {
+      console.error('❌ Not a git repository:', projectPath);
+      process.exit(1);
+    }
+
+    const projectName = path.basename(projectPath);
+    const installed = gitHookManager.areHooksInstalled(projectPath);
+    const config = gitHookManager.getHookConfig(projectPath);
+
+    console.log(`📁 Project: ${projectName}`);
+    console.log(`📍 Path: ${projectPath}`);
+    console.log(`🔗 Hooks installed: ${installed ? '✅ Yes' : '❌ No'}`);
+
+    if (config) {
+      console.log(`⚙️  Configuration:`);
+      console.log(`   Validation level: ${config.validationLevel}`);
+      console.log(`   Auto-fix: ${config.autoFix ? 'enabled' : 'disabled'}`);
+      console.log(`   Pre-commit: ${config.preCommitEnabled ? 'enabled' : 'disabled'}`);
+    }
+
+    if (!installed) {
+      const { shouldInstall } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'shouldInstall',
+          message: 'Would you like to install hooks now?',
+          default: true
+        }
+      ]);
+
+      if (shouldInstall) {
+        // Call install hook logic directly
+        await installHooks();
+      }
+    }
+  });
+
+hookCmd
+  .command('validate')
+  .description('Validate git identity for current project')
+  .action(async () => {
+    const projectPath = process.cwd();
+
     try {
-      const resolvedPath = path.resolve(projectPath);
-      
-      const result = gitHookManager.validateCommit(resolvedPath);
-      
+      const result = gitHookManager.validateCommit(projectPath);
+
       console.log(result.message);
-      
-      if (!result.valid) {
-        // Try auto-fix if suggested account is available
-        if (result.suggestedAccount) {
-          const hookConfig = gitHookManager.getHookConfig(resolvedPath);
-          
-          if (hookConfig?.autoFix) {
-            console.log('\n🔧 Attempting auto-fix...');
-            const fixed = gitHookManager.autoFixIdentity(resolvedPath, result.suggestedAccount);
-            
-            if (fixed) {
-              console.log('✅ Identity auto-fixed successfully!');
-              process.exit(0);
-            } else {
-              console.log('❌ Auto-fix failed');
-            }
+
+      if (!result.valid && result.suggestedAccount) {
+        const { shouldFix } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'shouldFix',
+            message: 'Would you like to fix the identity automatically?',
+            default: true
+          }
+        ]);
+
+        if (shouldFix) {
+          const fixed = gitHookManager.autoFixIdentity(projectPath, result.suggestedAccount);
+
+          if (fixed) {
+            console.log('✅ Identity auto-fixed successfully!');
+          } else {
+            console.log('❌ Auto-fix failed');
           }
         }
-        
-        process.exit(1);
       }
-      
-      process.exit(0);
-      
+
     } catch (error) {
       console.error('❌ Validation error:', error);
       process.exit(1);
     }
   });
 
-// Stage 3 Enterprise Commands
+// Helper Functions
+async function installHooks() {
+  const projectPath = process.cwd();
 
-program
-  .command('team')
-  .description('Manage enterprise teams and collaboration')
-  .option('-c, --create <name>', 'create new team')
-  .option('-l, --list', 'list all teams')
-  .option('-i, --invite <email>', 'invite member to team')
-  .option('-s, --share <teamId>', 'generate team share code')
-  .option('-j, --join <shareCode>', 'join team using share code')
-  .option('--org <organization>', 'organization name for new team')
-  .option('--role <role>', 'member role (admin, member, viewer)', 'member')
-  .action(async (options) => {
-    try {
-      if (options.create) {
-        if (!options.org) {
-          console.error('❌ Organization name is required for creating a team');
-          process.exit(1);
-        }
-        
-        const team = teamManager.createTeam({
-          name: options.create,
-          organization: options.org,
-          accounts: [],
-          projectRules: [],
-          policies: [],
-          members: [{
-            id: 'current-user',
-            email: 'current-user@company.com',
-            name: 'Current User',
-            role: 'admin',
-            joinedAt: new Date(),
-            lastActive: new Date(),
-            permissions: ['all']
-          }],
-          createdBy: 'current-user'
-        });
-        
-        console.log(`✅ Created team: ${team.name}`);
-        console.log(`   ID: ${team.id}`);
-        console.log(`   Organization: ${team.organization}`);
-        
-      } else if (options.list) {
-        const teams = teamManager.getTeams();
-        
-        if (teams.length === 0) {
-          console.log('📋 No teams found');
-          console.log('💡 Create your first team with: gitswitch team --create "Team Name" --org "Organization"');
-          return;
-        }
-        
-        console.log(`📄 Found ${teams.length} team(s):\n`);
-        
-        for (const team of teams) {
-          console.log(`💼 ${team.name} (${team.organization})`);
-          console.log(`   ID: ${team.id}`);
-          console.log(`   Members: ${team.members.length}`);
-          console.log(`   Rules: ${team.projectRules.length}`);
-          console.log(`   Created: ${team.sharedAt.toLocaleDateString()}`);
-          console.log('');
-        }
-        
-      } else if (options.share) {
-        const shareCode = teamManager.generateShareCode(options.share);
-        console.log(`🔗 Team Share Code:`);
-        console.log(`   ${shareCode}`);
-        console.log('');
-        console.log('💡 Share this code with team members to invite them');
-        
-      } else if (options.join) {
-        const shareData = teamManager.parseShareCode(options.join);
-        
-        if (!shareData) {
-          console.error('❌ Invalid share code');
-          process.exit(1);
-        }
-        
-        console.log(`📄 Team Invitation:`);
-        console.log(`   Team: ${shareData.teamName}`);
-        console.log(`   Organization: ${shareData.organization}`);
-        console.log(`   Invited: ${shareData.invitedAt.toLocaleDateString()}`);
-        console.log('');
-        console.log('💡 Contact team admin to complete the invitation process');
-        
-      } else {
-        console.log('💼 Enterprise Team Management');
-        console.log('');
-        console.log('Available commands:');
-        console.log('  --create <name> --org <org>    Create new team');
-        console.log('  --list                         List all teams');
-        console.log('  --share <teamId>               Generate share code');
-        console.log('  --join <shareCode>             Join team with code');
-      }
-      
-    } catch (error) {
-      console.error('❌ Failed to manage team:', error);
-      process.exit(1);
+  if (!gitManager.isGitRepository(projectPath)) {
+    console.error('❌ Not a git repository:', projectPath);
+    return;
+  }
+
+  const { validationLevel, autoFix } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'validationLevel',
+      message: 'Choose validation level:',
+      choices: [
+        { name: 'Strict - Block commits with wrong identity', value: 'strict' },
+        { name: 'Warning - Show warning but allow commits', value: 'warning' },
+        { name: 'Off - No validation', value: 'off' }
+      ]
+    },
+    {
+      type: 'confirm',
+      name: 'autoFix',
+      message: 'Enable automatic identity fixing?',
+      default: true
     }
+  ]);
+
+  const config: GitHookInstallConfig = {
+    validationLevel: validationLevel as 'strict' | 'warning' | 'off',
+    autoFix,
+    preCommitEnabled: true
+  };
+
+  console.log(`🔧 Installing git hooks...`);
+  console.log(`   Validation: ${config.validationLevel}`);
+  console.log(`   Auto-fix: ${config.autoFix ? 'enabled' : 'disabled'}`);
+
+  const success = gitHookManager.installHooks(projectPath, config);
+
+  if (success) {
+    console.log('✅ Git hooks installed successfully!');
+    console.log('💡 Hooks will now validate git identity before each commit');
+  } else {
+    console.error('❌ Failed to install git hooks');
+  }
+}
+
+async function scanProjects() {
+  const { scanPath, depth, shouldImport } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'scanPath',
+      message: 'Enter path to scan:',
+      default: '.'
+    },
+    {
+      type: 'number',
+      name: 'depth',
+      message: 'Maximum scan depth:',
+      default: 3
+    },
+    {
+      type: 'confirm',
+      name: 'shouldImport',
+      message: 'Automatically import found projects?',
+      default: true
+    }
+  ]);
+
+  try {
+    console.log(`🔍 Scanning ${path.resolve(scanPath)} for git projects...`);
+
+    const result = await projectScanner.scanDirectory(path.resolve(scanPath), depth);
+
+    console.log(`✅ Scan completed in ${result.duration}ms`);
+    console.log(`📁 Found ${result.totalFound} git project(s)`);
+
+    if (result.projects.length === 0) {
+      console.log('📋 No git projects found in the specified directory');
+      return;
+    }
+
+    displayProjects(result.projects);
+
+    if (shouldImport) {
+      console.log('📥 Importing projects...');
+
+      for (const project of result.projects) {
+        const existingProjects = storageManager.getProjects();
+        const exists = existingProjects.find(p => p.path === project.path);
+
+        if (!exists) {
+          storageManager.upsertProject(project);
+          console.log(`  ✅ Imported: ${project.name}`);
+        } else {
+          console.log(`  ⏭️  Skipped: ${project.name} (already exists)`);
+        }
+      }
+
+      console.log(`✅ Import completed. ${result.projects.length} project(s) processed.`);
+    }
+
+  } catch (error) {
+    console.error('❌ Failed to scan directory:', error);
+    process.exit(1);
+  }
+}
+
+async function importFromCommon() {
+  console.log('📁 Scanning common development directories...');
+  const commonResults = await projectScanner.scanCommonPaths();
+  const importedProjects = commonResults.flatMap(result => result.projects);
+
+  if (importedProjects.length === 0) {
+    console.log('📋 No projects found in common directories');
+    return;
+  }
+
+  console.log(`\n📥 Found ${importedProjects.length} project(s) to import...`);
+
+  let imported = 0;
+  let skipped = 0;
+
+  for (const project of importedProjects) {
+    const existingProjects = storageManager.getProjects();
+    const exists = existingProjects.find(p => p.path === project.path);
+
+    if (!exists) {
+      storageManager.upsertProject(project);
+      imported++;
+      console.log(`  ✅ ${project.name}`);
+    } else {
+      skipped++;
+    }
+  }
+
+  console.log(`\n✅ Import completed!`);
+  console.log(`   Imported: ${imported} projects`);
+  console.log(`   Skipped: ${skipped} projects (already exist)`);
+}
+
+async function bulkImportWithOptions() {
+  const { paths, maxDepth, detectAccounts } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'paths',
+      message: 'Enter paths to scan (comma-separated):'
+    },
+    {
+      type: 'number',
+      name: 'maxDepth',
+      message: 'Maximum scan depth:',
+      default: 4
+    },
+    {
+      type: 'confirm',
+      name: 'detectAccounts',
+      message: 'Detect and create accounts from git configs?',
+      default: true
+    }
+  ]);
+
+  const scanPaths = paths.split(',').map((p: string) => p.trim());
+
+  const importConfig = {
+    sourcePaths: scanPaths,
+    scanDepth: maxDepth,
+    autoDetectAccounts: detectAccounts,
+    createMissingAccounts: detectAccounts,
+    applySmartSuggestions: true,
+    importPatterns: true,
+    excludePatterns: [],
+    includePatterns: [],
+    dryRun: false
+  };
+
+  console.log('📥 Starting bulk import...');
+
+  const result = await bulkImportManager.executeImport(importConfig, (step: any) => {
+    console.log(`📍 Step ${step.number}/5: ${step.name}`);
+    console.log(`   ${step.status === 'completed' ? '✅' : '⏳'} ${step.description}`);
   });
 
-program
-  .command('security')
-  .description('Manage enterprise security and compliance')
-  .option('-p, --policies', 'list security policies')
-  .option('-a, --audit [filter]', 'show audit log')
-  .option('-s, --signing <accountId>', 'configure commit signing')
-  .option('--export-audit <format>', 'export audit log (json, csv)')
-  .option('--verify-signatures [path]', 'verify commit signatures')
-  .option('--setup-sso <provider>', 'setup SSO provider')
-  .option('--domain <domain>', 'SSO domain')
-  .action(async (options) => {
-    try {
-      if (options.policies) {
-        const policies = securityManager.getSecurityPolicies();
-        
-        if (policies.length === 0) {
-          console.log('📋 No security policies configured');
-          console.log('💡 Configure policies through the desktop app for enterprise compliance');
-          return;
-        }
-        
-        console.log(`🔒 Security Policies (${policies.length}):\n`);
-        
-        for (const policy of policies) {
-          console.log(`🛡️  ${policy.name}`);
-          console.log(`   Signed commits: ${policy.requireSignedCommits ? '✅' : '❌'}`);
-          console.log(`   Audit logging: ${policy.auditLogging ? '✅' : '❌'}`);
-          console.log(`   SSH keys required: ${policy.requiredSSHKeys ? '✅' : '❌'}`);
-          console.log(`   Allowed domains: ${policy.allowedDomains.join(', ')}`);
-          console.log('');
-        }
-        
-      } else if (options.audit) {
-        const events = securityManager.getAuditEvents({ limit: 20 });
-        
-        if (events.length === 0) {
-          console.log('📋 No audit events found');
-          return;
-        }
-        
-        console.log(`📊 Audit Log (Last ${events.length} events):\n`);
-        
-        for (const event of events) {
-          const severity = event.severity === 'critical' ? '🔴' : 
-                          event.severity === 'warning' ? '🟡' : '🟢';
-          
-          console.log(`${severity} ${event.timestamp.toLocaleString()}`);
-          console.log(`   User: ${event.userEmail}`);
-          console.log(`   Action: ${event.action}`);
-          if (event.projectPath) {
-            console.log(`   Project: ${event.projectPath}`);
-          }
-          console.log('');
-        }
-        
-      } else if (options.exportAudit) {
-        const format = options.exportAudit as 'json' | 'csv';
-        const auditData = securityManager.exportAuditLog(format, {});
-        const filename = `gitswitch-audit-${new Date().toISOString().split('T')[0]}.${format}`;
-        
-        require('fs').writeFileSync(filename, auditData);
-        console.log(`✅ Audit log exported to: ${filename}`);
-        
-      } else if (options.verifySignatures) {
-        const projectPath = options.verifySignatures === true ? '.' : options.verifySignatures;
-        const result = securityManager.verifyCommitSignatures(path.resolve(projectPath));
-        
-        console.log(`🔍 Signature Verification Results:`);
-        console.log(`   ✅ Verified: ${result.verified}`);
-        console.log(`   ❌ Unverified: ${result.unverified}`);
-        
-        if (result.errors.length > 0) {
-          console.log(`   ⚠️  Errors: ${result.errors.length}`);
-          result.errors.forEach(error => console.log(`      ${error}`));
-        }
-        
-      } else {
-        console.log('🔒 Enterprise Security & Compliance');
-        console.log('');
-        console.log('Available commands:');
-        console.log('  --policies                     List security policies');
-        console.log('  --audit                        Show audit log');
-        console.log('  --export-audit <format>        Export audit log');
-        console.log('  --verify-signatures [path]     Verify commit signatures');
-        console.log('  --setup-sso <provider>         Setup SSO provider');
-      }
-      
-    } catch (error) {
-      console.error('❌ Failed to manage security:', error);
-      process.exit(1);
+  console.log('\n🎉 Bulk Import Complete!');
+  console.log(`✅ Successfully imported: ${result.projectsImported} projects`);
+  console.log(`👤 New accounts created: ${result.accountsCreated}`);
+  console.log(`🎯 Patterns generated: ${result.patternsCreated}`);
+}
+
+async function importFromCustomPath() {
+  const { customPath } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'customPath',
+      message: 'Enter custom path to scan:'
     }
+  ]);
+
+  // Reuse scan logic with custom path
+  await scanProjects();
+}
+
+async function loginWithGitHub() {
+  console.log('🚀 Starting GitHub authentication...\n');
+
+  try {
+    const account = await oauthManager.authenticateWithProvider('github', async (userCode, verificationUri) => {
+      await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'continue',
+          message: `Device code: ${userCode}\nVerification URL: ${verificationUri}\n\nPress Enter to copy code and open browser...`
+        }
+      ]);
+
+      // Copy device code to clipboard
+      console.log('📋 Copying device code to clipboard...');
+      await copyToClipboard(userCode);
+    });
+
+    console.log('\n🎉 GitHub authentication successful!\n');
+    console.log(`✅ Account: ${account.name} (${account.email})`);
+    console.log(`🔗 Profile: ${account.profileUrl || 'N/A'}`);
+    console.log(`📧 Email verified: ${account.verified ? 'Yes' : 'No'}`);
+    console.log('\n💡 You can now use GitSwitch with your GitHub account!');
+
+  } catch (error: any) {
+    console.error('\n❌ GitHub authentication failed:', error.message);
+    process.exit(1);
+  }
+}
+
+async function copyToClipboard(text: string): Promise<void> {
+  return new Promise((resolve) => {
+    // Clean the text - remove any extra whitespace or special characters
+    const cleanText = text.trim();
+    
+    let command: string;
+    
+    switch (process.platform) {
+      case 'win32':
+        // Use powershell for more reliable clipboard on Windows
+        command = `powershell -command "Set-Clipboard -Value '${cleanText}'"`;
+        break;
+      case 'darwin':
+        // Use printf instead of echo to avoid newlines
+        command = `printf '${cleanText}' | pbcopy`;
+        break;
+      default:
+        // Linux - use printf and ensure xclip is available
+        command = `printf '${cleanText}' | xclip -selection clipboard 2>/dev/null || printf '${cleanText}' | xsel --clipboard --input`;
+        break;
+    }
+    
+    exec(command, (error) => {
+      if (error) {
+        console.log('⚠️  Could not copy to clipboard. Please copy the code manually.');
+        console.log(`Device code: ${cleanText}`);
+      } else {
+        console.log('✅ Code copied to clipboard!');
+      }
+      resolve();
+    });
+  });
+}
+
+async function setDefaultAccount(accounts: any[]) {
+  const { accountId } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'accountId',
+      message: 'Select default account:',
+      choices: accounts.map(account => ({
+        name: `${account.name} (${account.email})`,
+        value: account.id
+      }))
+    }
+  ]);
+
+  // Update default account logic
+  accounts.forEach(account => {
+    account.isDefault = account.id === accountId;
+    storageManager.updateAccount(account.id, account);
   });
 
-program
-  .command('enterprise')
-  .description('Enterprise features and administration')
-  .option('-s, --status', 'show enterprise status')
-  .option('-u, --upgrade', 'upgrade to enterprise features')
-  .option('-c, --compliance <standard>', 'setup compliance standard (sox, iso27001, gdpr)')
-  .action(async (options) => {
-    try {
-      if (options.status) {
-        const teams = teamManager.getTeams();
-        const policies = securityManager.getSecurityPolicies();
-        const auditEvents = securityManager.getAuditEvents({ limit: 1 });
-        
-        console.log('🏢 GitSwitch Enterprise Status\n');
-        
-        console.log(`💼 Teams: ${teams.length}`);
-        console.log(`🔒 Security Policies: ${policies.length}`);
-        console.log(`📊 Audit Events: ${auditEvents.length > 0 ? 'Active' : 'None'}`);
-        
-        const features = [
-          '✅ Team Configuration Management',
-          '✅ Enterprise Security Policies',
-          '✅ Audit Logging & Compliance',
-          '✅ Advanced Git Operations',
-          '✅ SSO Integration Ready',
-          '✅ Commit Signing Management'
-        ];
-        
-        console.log('\n🎆 Enterprise Features:');
-        features.forEach(feature => console.log(`  ${feature}`));
-        
-      } else if (options.compliance) {
-        const standard = options.compliance.toLowerCase();
-        
-        console.log(`📄 Setting up ${standard.toUpperCase()} compliance...`);
-        
-        // This would configure appropriate security policies
-        const policy = securityManager.createSecurityPolicy({
-          name: `${standard.toUpperCase()} Compliance Policy`,
-          requireSignedCommits: true,
-          allowedDomains: ['github.com'],
-          requiredSSHKeys: true,
-          auditLogging: true,
-          restrictAccountCreation: true,
-          complianceStandard: standard as any,
-          allowPersonalRepos: false,
-          requireMFA: true
-        });
-        
-        console.log(`✅ ${standard.toUpperCase()} compliance policy created`);
-        console.log(`   Policy ID: ${policy.id}`);
-        console.log('   ✅ Signed commits required');
-        console.log('   ✅ Audit logging enabled');
-        console.log('   ✅ SSH keys required');
-        console.log('   ✅ MFA required');
-        
-      } else {
-        console.log('🏢 GitSwitch Enterprise');
-        console.log('');
-        console.log('Enterprise-grade git identity management with:');
-        console.log('  ✅ Team collaboration and sharing');
-        console.log('  ✅ Advanced security and compliance');
-        console.log('  ✅ Audit logging and reporting');
-        console.log('  ✅ SSO integration');
-        console.log('  ✅ Workflow automation');
-        console.log('');
-        console.log('Available commands:');
-        console.log('  --status                       Show enterprise status');
-        console.log('  --compliance <standard>        Setup compliance (sox, iso27001, gdpr)');
-      }
-      
-    } catch (error) {
-      console.error('❌ Failed to manage enterprise features:', error);
-      process.exit(1);
+  const selectedAccount = accounts.find(a => a.id === accountId);
+  console.log(`✅ Set default account: ${selectedAccount?.name} (${selectedAccount?.email})`);
+}
+
+async function editAccount(accounts: any[]) {
+  const { accountId } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'accountId',
+      message: 'Select account to edit:',
+      choices: accounts.map(account => ({
+        name: `${account.name} (${account.email})`,
+        value: account.id
+      }))
     }
-  });
+  ]);
 
-// Configuration Sync Commands
+  const account = accounts.find(a => a.id === accountId);
 
-program
-  .command('sync')
-  .description('Manage configuration synchronization and sharing')
-  .option('-s, --setup <provider>', 'setup sync provider (team, cloud, github)')
-  .option('-n, --now', 'trigger manual sync now')
-  .option('--status', 'show sync status')
-  .option('--disable', 'disable synchronization')
-  .option('--scope <scope>', 'sync scope (accounts, patterns, teams, all)', 'all')
-  .option('--auto', 'enable automatic sync')
-  .option('--interval <minutes>', 'sync interval in minutes', '60')
-  .action(async (options) => {
-    try {
-      if (options.setup) {
-        const provider = options.setup;
-        const validProviders = ['team', 'cloud', 'github'];
-        
-        if (!validProviders.includes(provider)) {
-          console.error(`❌ Invalid provider. Use: ${validProviders.join(', ')}`);
-          process.exit(1);
-        }
-
-        console.log(`🔄 Setting up sync with ${provider}...`);
-        
-        const syncConfig = {
-          provider: provider as 'team' | 'cloud' | 'github',
-          syncScope: options.scope as 'accounts' | 'patterns' | 'teams' | 'all',
-          autoSync: !!options.auto,
-          syncInterval: parseInt(options.interval),
-          conflictResolution: 'manual' as const,
-          enabled: true
-        };
-
-        const success = configSyncManager.setupSync(syncConfig);
-        
-        if (success) {
-          console.log('✅ Sync configuration saved');
-          console.log(`   Provider: ${provider}`);
-          console.log(`   Scope: ${options.scope}`);
-          console.log(`   Auto-sync: ${options.auto ? 'enabled' : 'disabled'}`);
-          if (options.auto) {
-            console.log(`   Interval: ${options.interval} minutes`);
-          }
-        } else {
-          console.error('❌ Failed to setup sync');
-          process.exit(1);
-        }
-        
-      } else if (options.now) {
-        console.log('🔄 Starting manual sync...');
-        
-        const result = await configSyncManager.syncNow();
-        
-        if (result.success) {
-          console.log('✅ Sync completed successfully');
-          console.log(`   Items synced: ${result.itemsSynced}`);
-          console.log(`   Changes: ${result.changes.length}`);
-          
-          if (result.changes.length > 0) {
-            console.log('\n📝 Changes:');
-            result.changes.forEach(change => console.log(`   • ${change}`));
-          }
-          
-          if (result.conflicts && result.conflicts.length > 0) {
-            console.log(`\n⚠️  ${result.conflicts.length} conflict(s) detected`);
-            console.log('   Use --resolve to handle conflicts');
-          }
-        } else {
-          console.error('❌ Sync failed');
-          if (result.changes.length > 0) {
-            console.log('\nError details:');
-            result.changes.forEach(change => console.log(`   • ${change}`));
-          }
-          process.exit(1);
-        }
-        
-      } else if (options.status) {
-        const status = configSyncManager.getSyncStatus();
-        
-        console.log('🔄 Sync Status:');
-        console.log(`   Enabled: ${status.enabled ? '✅' : '❌'}`);
-        console.log(`   Last sync: ${status.lastSync ? status.lastSync.toLocaleString() : 'Never'}`);
-        console.log(`   In progress: ${status.syncInProgress ? 'Yes' : 'No'}`);
-        console.log(`   Last result: ${status.lastSyncResult}`);
-        
-        if (status.conflictsCount > 0) {
-          console.log(`   Conflicts: ${status.conflictsCount}`);
-        }
-        
-      } else if (options.disable) {
-        const success = configSyncManager.disableSync();
-        
-        if (success) {
-          console.log('✅ Sync disabled');
-        } else {
-          console.error('❌ Failed to disable sync');
-          process.exit(1);
-        }
-        
-      } else {
-        console.log('🔄 Configuration Synchronization');
-        console.log('');
-        console.log('Available commands:');
-        console.log('  --setup <provider>     Setup sync (team, cloud, github)');
-        console.log('  --now                  Trigger manual sync');
-        console.log('  --status               Show sync status');
-        console.log('  --disable              Disable sync');
-        console.log('');
-        console.log('Options:');
-        console.log('  --scope <scope>        Sync scope (accounts, patterns, teams, all)');
-        console.log('  --auto                 Enable automatic sync');
-        console.log('  --interval <minutes>   Set sync interval');
-      }
-      
-    } catch (error) {
-      console.error('❌ Sync operation failed:', error);
-      process.exit(1);
+  const { name, gitName, email, description } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'name',
+      message: 'Display name:',
+      default: account.name
+    },
+    {
+      type: 'input',
+      name: 'gitName',
+      message: 'Git name:',
+      default: account.gitName
+    },
+    {
+      type: 'input',
+      name: 'email',
+      message: 'Email:',
+      default: account.email
+    },
+    {
+      type: 'input',
+      name: 'description',
+      message: 'Description:',
+      default: account.description
     }
-  });
+  ]);
 
-program
-  .command('share')
-  .description('Share and import configurations')
-  .option('-c, --config <items>', 'items to share (accounts,patterns,teams)', 'all')
-  .option('-t, --team <teamId>', 'share within team context')
-  .option('-i, --import <shareCode>', 'import from share code')
-  .action(async (options) => {
-    try {
-      if (options.import) {
-        console.log('📥 Importing shared configuration...');
-        
-        const success = configSyncManager.importConfiguration(options.import);
-        
-        if (success) {
-          console.log('✅ Configuration imported successfully');
-        } else {
-          console.error('❌ Failed to import configuration');
-          process.exit(1);
-        }
-        
-      } else {
-        const items = options.config === 'all' 
-          ? ['accounts', 'patterns', 'teams'] 
-          : options.config.split(',');
-        
-        console.log(`📤 Sharing configuration: ${items.join(', ')}`);
-        
-        const shareCode = configSyncManager.shareConfiguration(items, options.team);
-        
-        console.log('✅ Share code generated:');
-        console.log(`   ${shareCode}`);
-        console.log('');
-        console.log('💡 Share this code with team members to import the configuration');
-        console.log('   Valid for 7 days');
-      }
-      
-    } catch (error) {
-      console.error('❌ Share operation failed:', error);
-      process.exit(1);
+  const updatedAccount = { ...account, name, gitName, email, description };
+  storageManager.updateAccount(accountId, updatedAccount);
+
+  console.log(`✅ Updated account: ${name} (${email})`);
+}
+
+async function removeAccount(accounts: any[]) {
+  const { accountId } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'accountId',
+      message: 'Select account to remove:',
+      choices: accounts.map(account => ({
+        name: `${account.name} (${account.email})`,
+        value: account.id
+      }))
     }
-  });
+  ]);
 
-// Plugin Management Commands
+  const account = accounts.find(a => a.id === accountId);
 
-program
-  .command('plugins')
-  .description('Manage GitSwitch plugins')
-  .option('-l, --list', 'list installed plugins')
-  .option('-s, --search <query>', 'search marketplace for plugins')
-  .option('-i, --install <pluginId>', 'install a plugin')
-  .option('-u, --uninstall <pluginId>', 'uninstall a plugin')
-  .option('-e, --enable <pluginId>', 'enable a plugin')
-  .option('-d, --disable <pluginId>', 'disable a plugin')
-  .option('--category <category>', 'filter by category (integration, automation, ui, security, analytics)')
-  .option('--version <version>', 'specify version for installation')
-  .action(async (options) => {
-    try {
-      if (options.list) {
-        const plugins = pluginManager.getInstalledPlugins();
-        
-        if (plugins.length === 0) {
-          console.log('📦 No plugins installed');
-          console.log('\n💡 Use --search to find plugins or --install to install one');
-          return;
-        }
-        
-        console.log(`📦 Installed Plugins (${plugins.length}):\n`);
-        
-        for (const plugin of plugins) {
-          const statusIcon = {
-            'active': '🟢',
-            'inactive': '🟡', 
-            'error': '🔴',
-            'disabled': '⚫'
-          }[plugin.status] || '⚪';
-          
-          console.log(`${statusIcon} ${plugin.manifest.name} (${plugin.id})`);
-          console.log(`   Version: ${plugin.manifest.version}`);
-          console.log(`   Author: ${plugin.manifest.author}`);
-          console.log(`   Status: ${plugin.status}`);
-          console.log(`   Enabled: ${plugin.enabled ? 'Yes' : 'No'}`);
-          console.log(`   Category: ${plugin.manifest.category}`);
-          console.log(`   Installed: ${plugin.installedAt.toLocaleDateString()}`);
-          
-          if (plugin.errorMessage) {
-            console.log(`   Error: ${plugin.errorMessage}`);
-          }
-          
-          console.log('');
-        }
-        
-      } else if (options.search) {
-        console.log(`🔍 Searching marketplace for: ${options.search}`);
-        
-        const results = await pluginManager.searchPlugins(options.search, options.category);
-        
-        if (results.plugins.length === 0) {
-          console.log('No plugins found matching your search criteria');
-          return;
-        }
-        
-        console.log(`\n📋 Found ${results.total} plugin(s):\n`);
-        
-        for (const plugin of results.plugins) {
-          const verifiedIcon = plugin.verified ? '✅' : '⚠️';
-          const ratingStars = '⭐'.repeat(Math.floor(plugin.rating));
-          
-          console.log(`${verifiedIcon} ${plugin.name} (${plugin.id})`);
-          console.log(`   ${plugin.description}`);
-          console.log(`   Version: ${plugin.version} | Author: ${plugin.author}`);
-          console.log(`   Category: ${plugin.category} | Downloads: ${plugin.downloads.toLocaleString()}`);
-          console.log(`   Rating: ${ratingStars} ${plugin.rating}/5`);
-          console.log(`   Size: ${(plugin.size / 1024 / 1024).toFixed(1)} MB`);
-          
-          if (plugin.repository) {
-            console.log(`   Repository: ${plugin.repository}`);
-          }
-          
-          console.log('');
-        }
-        
-        console.log('💡 Use --install <pluginId> to install a plugin');
-        
-      } else if (options.install) {
-        const pluginId = options.install;
-        console.log(`📦 Installing plugin: ${pluginId}${options.version ? `@${options.version}` : ''}`);
-        
-        const result = await pluginManager.installPlugin(pluginId, options.version);
-        
-        if (result.success) {
-          console.log(`✅ Plugin ${pluginId} installed successfully!`);
-          console.log(`   Version: ${result.version}`);
-          
-          if (result.warnings && result.warnings.length > 0) {
-            console.log('\n⚠️ Warnings:');
-            result.warnings.forEach(warning => console.log(`   • ${warning}`));
-          }
-          
-          console.log('\n💡 Use --enable to activate the plugin');
-        } else {
-          console.error(`❌ Failed to install plugin: ${result.error}`);
-          process.exit(1);
-        }
-        
-      } else if (options.uninstall) {
-        const pluginId = options.uninstall;
-        console.log(`🗑️ Uninstalling plugin: ${pluginId}`);
-        
-        const success = await pluginManager.uninstallPlugin(pluginId);
-        
-        if (success) {
-          console.log(`✅ Plugin ${pluginId} uninstalled successfully`);
-        } else {
-          console.error(`❌ Failed to uninstall plugin ${pluginId}`);
-          process.exit(1);
-        }
-        
-      } else if (options.enable) {
-        const pluginId = options.enable;
-        console.log(`🔌 Enabling plugin: ${pluginId}`);
-        
-        const success = await pluginManager.enablePlugin(pluginId);
-        
-        if (success) {
-          console.log(`✅ Plugin ${pluginId} enabled`);
-          console.log('💡 Plugin will be activated on next restart or manually');
-        } else {
-          console.error(`❌ Failed to enable plugin ${pluginId}`);
-          process.exit(1);
-        }
-        
-      } else if (options.disable) {
-        const pluginId = options.disable;
-        console.log(`🔌 Disabling plugin: ${pluginId}`);
-        
-        const success = await pluginManager.disablePlugin(pluginId);
-        
-        if (success) {
-          console.log(`✅ Plugin ${pluginId} disabled`);
-        } else {
-          console.error(`❌ Failed to disable plugin ${pluginId}`);
-          process.exit(1);
-        }
-        
-      } else {
-        console.log('🔌 Plugin Management');
-        console.log('');
-        console.log('GitSwitch extensible plugin system for integrations and automation.');
-        console.log('');
-        console.log('Available commands:');
-        console.log('  --list                         List installed plugins');
-        console.log('  --search <query>               Search marketplace');
-        console.log('  --install <pluginId>           Install a plugin');
-        console.log('  --uninstall <pluginId>         Uninstall a plugin');
-        console.log('  --enable <pluginId>            Enable a plugin');
-        console.log('  --disable <pluginId>           Disable a plugin');
-        console.log('');
-        console.log('Options:');
-        console.log('  --category <category>          Filter by category');
-        console.log('  --version <version>            Specify version for install');
-        console.log('');
-        console.log('Categories: integration, automation, ui, security, analytics');
-      }
-      
-    } catch (error) {
-      console.error('❌ Plugin operation failed:', error);
-      process.exit(1);
+  const { confirm } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'confirm',
+      message: `Are you sure you want to remove "${account.name}" (${account.email})?`,
+      default: false
     }
-  });
+  ]);
 
-// Advanced Git Operations Commands
+  if (confirm) {
+    // Use deleteAccount instead of removeAccount
+    storageManager.deleteAccount(accountId);
+    console.log(`✅ Removed account: ${account.name} (${account.email})`);
+  }
+}
 
-program
-  .command('git')
-  .description('Advanced git operations and multi-remote management')
-  .option('-r, --remotes', 'list configured remotes')
-  .option('--add-remote <name:url:accountId>', 'add remote with account (format: name:url:accountId)')
-  .option('--remove-remote <name>', 'remove a remote')
-  .option('--set-account <remote:accountId>', 'set account for remote (format: remote:accountId)')
-  .option('--push <remote:branch>', 'push to specific remote/branch')
-  .option('--pull <remote:branch>', 'pull from specific remote/branch')
-  .option('--validate-branch [branch]', 'validate branch policies for current or specified branch')
-  .option('--policies', 'list branch policies')
-  .option('--add-policy <pattern:accountId:enforcement>', 'add branch policy (format: pattern:accountId:enforcement)')
-  .option('-f, --force', 'force operation (for push)')
-  .argument('[projectPath]', 'project path (defaults to current directory)', '.')
-  .action(async (projectPath, options) => {
-    try {
-      const resolvedPath = path.resolve(projectPath);
-      
-      if (!gitManager.isGitRepository(resolvedPath)) {
-        console.error('❌ Not a git repository:', resolvedPath);
-        process.exit(1);
-      }
-      
-      if (options.remotes) {
-        const remotes = advancedGitManager.getRemotes(resolvedPath);
-        
-        if (remotes.length === 0) {
-          console.log('📋 No remotes configured');
-          console.log('💡 Use --add-remote to add a remote');
-          return;
-        }
-        
-        console.log(`🔗 Configured Remotes (${remotes.length}):\n`);
-        
-        for (const remote of remotes) {
-          const pushIcon = remote.defaultForPush ? '⬆️' : '  ';
-          const pullIcon = remote.defaultForPull ? '⬇️' : '  ';
-          
-          console.log(`${pushIcon}${pullIcon} ${remote.name}`);
-          console.log(`   URL: ${remote.url}`);
-          console.log(`   Account: ${remote.account.name} <${remote.account.email}>`);
-          
-          if (remote.signingConfig) {
-            console.log(`   Signing: ${remote.signingConfig.keyType.toUpperCase()} (${remote.signingConfig.enabled ? 'enabled' : 'disabled'})`);
-          }
-          
-          console.log('');
-        }
-        
-      } else if (options.addRemote) {
-        const parts = options.addRemote.split(':');
-        if (parts.length !== 3) {
-          console.error('❌ Invalid format. Use: name:url:accountId');
-          process.exit(1);
-        }
-        
-        const [name, url, accountId] = parts;
-        const accounts = storageManager.getAccounts();
-        const account = accounts.find(a => a.id === accountId);
-        
-        if (!account) {
-          console.error(`❌ Account not found: ${accountId}`);
-          console.log('Available accounts:');
-          accounts.forEach(a => console.log(`  ${a.id}: ${a.name} <${a.email}>`));
-          process.exit(1);
-        }
-        
-        const success = advancedGitManager.addRemote(resolvedPath, {
-          name,
-          url,
-          account,
-          defaultForPush: false,
-          defaultForPull: false
-        });
-        
-        if (!success) {
-          process.exit(1);
-        }
-        
-      } else if (options.setAccount) {
-        const parts = options.setAccount.split(':');
-        if (parts.length !== 2) {
-          console.error('❌ Invalid format. Use: remote:accountId');
-          process.exit(1);
-        }
-        
-        const [remoteName, accountId] = parts;
-        const accounts = storageManager.getAccounts();
-        const account = accounts.find(a => a.id === accountId);
-        
-        if (!account) {
-          console.error(`❌ Account not found: ${accountId}`);
-          process.exit(1);
-        }
-        
-        const success = advancedGitManager.setRemoteAccount(resolvedPath, remoteName, account);
-        
-        if (!success) {
-          process.exit(1);
-        }
-        
-      } else if (options.push) {
-        const parts = options.push.split(':');
-        if (parts.length !== 2) {
-          console.error('❌ Invalid format. Use: remote:branch');
-          process.exit(1);
-        }
-        
-        const [remote, branch] = parts;
-        const result = await advancedGitManager.pushToRemote(resolvedPath, remote, branch, options.force);
-        
-        if (!result.success) {
-          console.error(`❌ Push failed: ${result.error}`);
-          process.exit(1);
-        }
-        
-      } else if (options.pull) {
-        const parts = options.pull.split(':');
-        if (parts.length !== 2) {
-          console.error('❌ Invalid format. Use: remote:branch');
-          process.exit(1);
-        }
-        
-        const [remote, branch] = parts;
-        const result = await advancedGitManager.pullFromRemote(resolvedPath, remote, branch);
-        
-        if (!result.success) {
-          console.error(`❌ Pull failed: ${result.error}`);
-          process.exit(1);
-        }
-        
-      } else if (options.validateBranch !== undefined) {
-        const branch = options.validateBranch || 'main'; // Default to main if no branch specified
-        const accounts = storageManager.getAccounts();
-        const currentConfig = gitManager.getCurrentConfig(resolvedPath);
-        
-        if (!currentConfig) {
-          console.error('❌ No git configuration found');
-          process.exit(1);
-        }
-        
-        const currentAccount = accounts.find(a => a.email === currentConfig.email);
-        if (!currentAccount) {
-          console.error('❌ Current git identity not found in accounts');
-          process.exit(1);
-        }
-        
-        const validation = advancedGitManager.validateBranchCommit(resolvedPath, branch, currentAccount);
-        
-        console.log(`🔍 Branch Validation: ${branch}`);
-        console.log(`✅ Valid: ${validation.valid ? 'Yes' : 'No'}\n`);
-        
-        console.log('Identity Check:');
-        console.log(`  Current: ${validation.identity.actual.name} <${validation.identity.actual.email}>`);
-        console.log(`  Expected: ${validation.identity.expected.name} <${validation.identity.expected.email}>`);
-        console.log(`  Correct: ${validation.identity.correct ? '✅' : '❌'}\n`);
-        
-        if (validation.policy.violations.length > 0) {
-          console.log('Policy Violations:');
-          validation.policy.violations.forEach(violation => console.log(`  ❌ ${violation}`));
-          console.log('');
-        }
-        
-        if (validation.recommendations.length > 0) {
-          console.log('Recommendations:');
-          validation.recommendations.forEach(rec => console.log(`  💡 ${rec}`));
-        }
-        
-      } else if (options.policies) {
-        const policies = advancedGitManager.getBranchPolicies(resolvedPath);
-        
-        if (policies.length === 0) {
-          console.log('📋 No branch policies configured');
-          console.log('💡 Use --add-policy to add a policy');
-          return;
-        }
-        
-        console.log(`🛡️ Branch Policies (${policies.length}):\n`);
-        
-        for (const policy of policies) {
-          const enforcementIcon = policy.enforcement === 'strict' ? '🔒' : 
-                                 policy.enforcement === 'warning' ? '⚠️' : '💡';
-          
-          console.log(`${enforcementIcon} ${policy.pattern}`);
-          console.log(`   Account: ${policy.requiredAccount.name} <${policy.requiredAccount.email}>`);
-          console.log(`   Enforcement: ${policy.enforcement}`);
-          console.log(`   Description: ${policy.description}`);
-          
-          if (policy.requireSignedCommits) {
-            console.log(`   🔐 Signed commits required`);
-          }
-          
-          console.log('');
-        }
-        
-      } else if (options.addPolicy) {
-        const parts = options.addPolicy.split(':');
-        if (parts.length !== 3) {
-          console.error('❌ Invalid format. Use: pattern:accountId:enforcement');
-          process.exit(1);
-        }
-        
-        const [pattern, accountId, enforcement] = parts;
-        const accounts = storageManager.getAccounts();
-        const account = accounts.find(a => a.id === accountId);
-        
-        if (!account) {
-          console.error(`❌ Account not found: ${accountId}`);
-          process.exit(1);
-        }
-        
-        if (!['strict', 'warning', 'advisory'].includes(enforcement)) {
-          console.error('❌ Invalid enforcement. Use: strict, warning, or advisory');
-          process.exit(1);
-        }
-        
-        const policy = advancedGitManager.addBranchPolicy({
-          pattern,
-          requiredAccount: account,
-          enforcement: enforcement as 'strict' | 'warning' | 'advisory',
-          requireSignedCommits: false,
-          requireLinearHistory: false,
-          description: `Policy for ${pattern}`
-        });
-        
-        console.log(`✅ Branch policy created: ${policy.id}`);
-        
-      } else {
-        console.log('🔗 Advanced Git Operations');
-        console.log('');
-        console.log('Multi-remote management, branch policies, and enterprise git features.');
-        console.log('');
-        console.log('Available commands:');
-        console.log('  --remotes                      List configured remotes');
-        console.log('  --add-remote <name:url:acct>   Add remote with account');
-        console.log('  --set-account <remote:acct>    Set account for remote');
-        console.log('  --push <remote:branch>         Push to specific remote/branch');
-        console.log('  --pull <remote:branch>         Pull from specific remote/branch');
-        console.log('  --validate-branch [branch]     Validate branch policies');
-        console.log('  --policies                     List branch policies');
-        console.log('  --add-policy <pat:acct:enf>    Add branch policy');
-        console.log('');
-        console.log('Options:');
-        console.log('  -f, --force                    Force operation');
-        console.log('');
-        console.log('Examples:');
-        console.log('  gitswitch git --add-remote origin:https://github.com/user/repo.git:account1');
-        console.log('  gitswitch git --push origin:main');
-        console.log('  gitswitch git --add-policy "main.*":account1:strict');
-      }
-      
-    } catch (error) {
-      console.error('❌ Git operation failed:', error);
-      process.exit(1);
+function displayProjects(projects: any[]) {
+  if (projects.length === 0) {
+    console.log('📋 No projects found');
+    return;
+  }
+
+  console.log(`📋 Found ${projects.length} project(s):\n`);
+
+  for (const project of projects) {
+    const accounts = storageManager.getAccounts();
+    const account = accounts.find(a => a.id === project.accountId);
+
+    console.log(`📁 ${project.name}`);
+    console.log(`   Path: ${project.path}`);
+    if (project.remoteUrl) {
+      console.log(`   Remote: ${project.remoteUrl}`);
     }
-  });
-
-// Workflow Automation Commands
-
-program
-  .command('workflow')
-  .description('Workflow automation and custom rules management')
-  .option('-l, --list', 'list automation rules')
-  .option('-c, --create', 'create a new automation rule (interactive)')
-  .option('-t, --test <ruleId>', 'test a rule without executing actions')
-  .option('-r, --run <ruleId>', 'manually trigger a rule')
-  .option('-d, --delete <ruleId>', 'delete a rule')
-  .option('-e, --enable <ruleId>', 'enable a rule')
-  .option('--disable <ruleId>', 'disable a rule')
-  .option('--team <teamId>', 'filter by team ID')
-  .option('--status', 'show automation engine status')
-  .action(async (options) => {
-    try {
-      if (options.list) {
-        const rules = workflowAutomationManager.getRules(options.team);
-        
-        if (rules.length === 0) {
-          console.log('📋 No automation rules configured');
-          console.log('💡 Use --create to create your first automation rule');
-          return;
-        }
-        
-        console.log(`⚙️ Automation Rules (${rules.length}):\n`);
-        
-        for (const rule of rules) {
-          const statusIcon = rule.enabled ? '✅' : '⚫';
-          const triggerIcon = {
-            'project_open': '📁',
-            'before_commit': '📝',
-            'after_clone': '🔄',
-            'schedule': '⏰',
-            'account_switch': '🔄',
-            'policy_violation': '⚠️'
-          }[rule.trigger.type] || '⚙️';
-          
-          console.log(`${statusIcon} ${rule.name} (${rule.id})`);
-          console.log(`   ${rule.description}`);
-          console.log(`   Trigger: ${triggerIcon} ${rule.trigger.type}`);
-          console.log(`   Priority: ${rule.priority} | Actions: ${rule.actions.length}`);
-          console.log(`   Triggered: ${rule.triggerCount} times | Errors: ${rule.errorCount}`);
-          
-          if (rule.lastTriggered) {
-            console.log(`   Last run: ${rule.lastTriggered.toLocaleString()}`);
-          }
-          
-          if (rule.teamId) {
-            console.log(`   Team: ${rule.teamId}`);
-          }
-          
-          console.log('');
-        }
-        
-      } else if (options.create) {
-        console.log('⚙️ Creating a new automation rule...');
-        console.log('');
-        
-        // For demonstration, create a sample rule
-        const sampleRule = workflowAutomationManager.createRule({
-          name: 'Auto-switch for work projects',
-          description: 'Automatically switch to work account for work repositories',
-          trigger: {
-            type: 'project_open',
-            debounceMs: 1000
-          },
-          conditions: [
-            {
-              type: 'remote_url',
-              operator: 'contains',
-              value: 'company.com',
-              caseSensitive: false
-            }
-          ],
-          actions: [
-            {
-              id: 'switch-to-work',
-              type: 'switch_account',
-              parameters: { accountId: 'work-account-id' },
-              continueOnError: false
-            },
-            {
-              id: 'notify-user',
-              type: 'notify',
-              parameters: { 
-                title: 'Account Switched',
-                message: 'Switched to work account for company project'
-              },
-              continueOnError: true
-            }
-          ],
-          enabled: true,
-          priority: 1,
-          createdBy: 'cli-user'
-        });
-        
-        console.log(`✅ Sample automation rule created: ${sampleRule.id}`);
-        console.log('💡 Use the desktop app for advanced rule creation');
-        
-      } else if (options.test) {
-        const ruleId = options.test;
-        const rules = workflowAutomationManager.getRules();
-        const rule = rules.find(r => r.id === ruleId || r.name.toLowerCase().includes(ruleId.toLowerCase()));
-        
-        if (!rule) {
-          console.error(`❌ Rule not found: ${ruleId}`);
-          process.exit(1);
-        }
-        
-        console.log(`🧪 Testing rule: "${rule.name}"`);
-        
-        // Mock context for testing
-        const testContext = {
-          projectPath: process.cwd(),
-          remoteUrl: 'https://github.com/company/project.git',
-          branch: 'main',
-          trigger: 'test'
-        };
-        
-        const result = workflowAutomationManager.testRule(rule, testContext);
-        
-        console.log(`\n✅ Match: ${result.match ? 'Yes' : 'No'}`);
-        console.log(`📝 Reason: ${result.reason}`);
-        
-        if (result.actions.length > 0) {
-          console.log(`\n🎯 Actions to execute:`);
-          result.actions.forEach((action, index) => {
-            console.log(`  ${index + 1}. ${action.type}: ${JSON.stringify(action.parameters)}`);
-          });
-        }
-        
-      } else if (options.run) {
-        const ruleId = options.run;
-        console.log(`🚀 Manually triggering rule: ${ruleId}`);
-        
-        const context = {
-          projectPath: process.cwd(),
-          trigger: 'manual',
-          timestamp: new Date().toISOString()
-        };
-        
-        const success = await workflowAutomationManager.triggerRule(ruleId, context);
-        
-        if (success) {
-          console.log('✅ Rule executed successfully');
-        } else {
-          console.error('❌ Rule execution failed');
-          process.exit(1);
-        }
-        
-      } else if (options.delete) {
-        const ruleId = options.delete;
-        console.log(`🗑️ Deleting rule: ${ruleId}`);
-        
-        const success = workflowAutomationManager.deleteRule(ruleId);
-        
-        if (success) {
-          console.log('✅ Rule deleted successfully');
-        } else {
-          console.error('❌ Failed to delete rule');
-          process.exit(1);
-        }
-        
-      } else if (options.enable) {
-        const ruleId = options.enable;
-        console.log(`✅ Enabling rule: ${ruleId}`);
-        
-        const success = workflowAutomationManager.updateRule(ruleId, { enabled: true });
-        
-        if (success) {
-          console.log('✅ Rule enabled successfully');
-        } else {
-          console.error('❌ Failed to enable rule');
-          process.exit(1);
-        }
-        
-      } else if (options.disable) {
-        const ruleId = options.disable;
-        console.log(`⚫ Disabling rule: ${ruleId}`);
-        
-        const success = workflowAutomationManager.updateRule(ruleId, { enabled: false });
-        
-        if (success) {
-          console.log('✅ Rule disabled successfully');
-        } else {
-          console.error('❌ Failed to disable rule');
-          process.exit(1);
-        }
-        
-      } else if (options.status) {
-        console.log('⚙️ Workflow Automation Engine Status\n');
-        
-        const rules = workflowAutomationManager.getRules();
-        const enabledRules = rules.filter(r => r.enabled);
-        const scheduledRules = rules.filter(r => r.enabled && r.trigger.type === 'schedule');
-        
-        console.log(`Total Rules: ${rules.length}`);
-        console.log(`Enabled Rules: ${enabledRules.length}`);
-        console.log(`Scheduled Rules: ${scheduledRules.length}`);
-        
-        const triggerCounts = rules.reduce((acc, rule) => {
-          acc[rule.trigger.type] = (acc[rule.trigger.type] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        
-        console.log('\n📊 Trigger Types:');
-        Object.entries(triggerCounts).forEach(([type, count]) => {
-          console.log(`  ${type}: ${count}`);
-        });
-        
-        const totalTriggers = rules.reduce((sum, rule) => sum + rule.triggerCount, 0);
-        const totalErrors = rules.reduce((sum, rule) => sum + rule.errorCount, 0);
-        
-        console.log('\n📊 Statistics:');
-        console.log(`  Total Executions: ${totalTriggers}`);
-        console.log(`  Total Errors: ${totalErrors}`);
-        console.log(`  Success Rate: ${totalTriggers > 0 ? ((totalTriggers - totalErrors) / totalTriggers * 100).toFixed(1) : 0}%`);
-        
-      } else {
-        console.log('⚙️ Workflow Automation');
-        console.log('');
-        console.log('Intelligent automation system for git identity management and workflows.');
-        console.log('');
-        console.log('Available commands:');
-        console.log('  --list                         List automation rules');
-        console.log('  --create                       Create a new rule (interactive)');
-        console.log('  --test <ruleId>                Test a rule without executing');
-        console.log('  --run <ruleId>                 Manually trigger a rule');
-        console.log('  --delete <ruleId>              Delete a rule');
-        console.log('  --enable <ruleId>              Enable a rule');
-        console.log('  --disable <ruleId>             Disable a rule');
-        console.log('  --status                       Show engine status');
-        console.log('');
-        console.log('Options:');
-        console.log('  --team <teamId>                Filter by team');
-        console.log('');
-        console.log('Triggers:');
-        console.log('  📁 project_open              When opening a project');
-        console.log('  📝 before_commit            Before making a commit');
-        console.log('  🔄 after_clone              After cloning a repository');
-        console.log('  ⏰ schedule                  Time-based triggers');
-        console.log('  🔄 account_switch           When switching accounts');
-        console.log('  ⚠️ policy_violation          When policies are violated');
-        console.log('');
-        console.log('Actions:');
-        console.log('  🔄 switch_account           Switch to specific account');
-        console.log('  🔔 notify                   Send notifications');
-        console.log('  🗋 run_command              Execute shell commands');
-        console.log('  ⚙️ set_config               Set git configuration');
-        console.log('  🚫 block_action             Block/prevent actions');
-        console.log('  📡 send_webhook             Send webhook notifications');
-        console.log('  📝 log_event               Log custom events');
-      }
-      
-    } catch (error) {
-      console.error('❌ Workflow automation failed:', error);
-      process.exit(1);
+    if (account) {
+      console.log(`   Account: ${account.email} (${account.name})`);
     }
-  });
+    console.log(`   Status: ${project.status}`);
 
-// System Tray Commands
-
-program
-  .command('tray')
-  .description('System tray integration and quick access features')
-  .option('--status', 'show tray integration status')
-  .option('--notify <title:message>', 'send a test notification (format: title:message)')
-  .option('--show', 'show the main GitSwitch window')
-  .option('--hide', 'hide the main GitSwitch window to tray')
-  .option('--current-project', 'show current project in tray context')
-  .action(async (options) => {
-    try {
-      if (options.status) {
-        console.log('🖥️ System Tray Integration Status\n');
-        
-        // Check if desktop app is running
-        console.log('Desktop App Status:');
-        console.log('  ✅ System tray integration available');
-        console.log('  ✅ Cross-platform tray support (Windows, macOS, Linux)');
-        console.log('  ✅ Context menu with quick actions');
-        console.log('  ✅ Notification system enabled');
-        
-        console.log('\n🎯 Quick Access Features:');
-        console.log('  🔄 Quick account switching from tray');
-        console.log('  📚 Recent projects (top 5)');
-        console.log('  ⚡ Quick actions (scan, accounts, analytics)');
-        console.log('  🔔 Smart notifications');
-        console.log('  🖥️ Show/hide main window');
-        
-        console.log('\n🔌 Tray Menu Actions:');
-        console.log('  • Right-click tray icon for context menu');
-        console.log('  • Double-click to show main window');
-        console.log('  • Switch git identities for current project');
-        console.log('  • Access recent projects instantly');
-        console.log('  • Quick scan for new repositories');
-        
-      } else if (options.notify) {
-        const parts = options.notify.split(':');
-        if (parts.length !== 2) {
-          console.error('❌ Invalid format. Use: title:message');
-          process.exit(1);
-        }
-        
-        const [title, message] = parts;
-        console.log(`🔔 Sending test notification: ${title}`);
-        console.log(`📝 Message: ${message}`);
-        
-        // Note: This would normally send via IPC to desktop app
-        console.log('✅ Notification sent to system tray');
-        console.log('💡 To see actual notifications, use the desktop app');
-        
-      } else if (options.show) {
-        console.log('🖥️ Showing GitSwitch main window...');
-        console.log('💡 This command works when the desktop app is running');
-        
-        // This would normally trigger the desktop app to show
-        console.log('✅ Show window command sent');
-        
-      } else if (options.hide) {
-        console.log('💭 Hiding GitSwitch to system tray...');
-        console.log('💡 GitSwitch will continue running in the background');
-        
-        // This would normally trigger the desktop app to hide
-        console.log('✅ Hide to tray command sent');
-        
-      } else if (options.currentProject) {
-        const projectPath = process.cwd();
-        
-        if (!gitManager.isGitRepository(projectPath)) {
-          console.log('❌ Current directory is not a git repository');
-          console.log('💡 Navigate to a git project to see tray context');
-          return;
-        }
-        
-        const project = projectManager.analyzeProject(projectPath);
-        const gitConfig = gitManager.getCurrentConfig(projectPath);
-        
-        console.log('📁 Current Project Tray Context\n');
-        
-        if (project) {
-          console.log(`Project: ${project.name}`);
-          console.log(`Path: ${project.path}`);
-          
-          if (project.remoteUrl) {
-            console.log(`Remote: ${project.remoteUrl}`);
-          }
-          
-          if (gitConfig) {
-            console.log(`\n👤 Current Identity:`);
-            console.log(`  Name: ${gitConfig.name}`);
-            console.log(`  Email: ${gitConfig.email}`);
-          }
-          
-          console.log('\n🖥️ Tray Menu Updates:');
-          console.log('  ✅ Project context available in tray');
-          console.log('  ✅ Quick identity switching enabled');
-          console.log('  ✅ Project-specific actions available');
-        }
-        
-      } else {
-        console.log('🖥️ System Tray Integration');
-        console.log('');
-        console.log('Quick access to GitSwitch functionality from your system tray.');
-        console.log('');
-        console.log('Available commands:');
-        console.log('  --status                       Show tray integration status');
-        console.log('  --notify <title:message>       Send a test notification');
-        console.log('  --show                         Show main GitSwitch window');
-        console.log('  --hide                         Hide to system tray');
-        console.log('  --current-project              Show current project context');
-        console.log('');
-        console.log('Tray Features:');
-        console.log('  🔄 Quick Account Switching       Switch git identities instantly');
-        console.log('  📚 Recent Projects             Access 5 most recent projects');
-        console.log('  ⚡ Quick Actions               Scan, manage accounts, analytics');
-        console.log('  🔔 Smart Notifications         Stay informed of important events');
-        console.log('  🖥️ Background Operation        Keep GitSwitch running minimized');
-        console.log('');
-        console.log('Usage:');
-        console.log('  • Right-click the tray icon for context menu');
-        console.log('  • Double-click to show the main window');
-        console.log('  • Close main window to minimize to tray');
-        console.log('  • Use "Quit GitSwitch" to completely exit');
-        console.log('');
-        console.log('Cross-Platform Support:');
-        console.log('  ✅ Windows - System notification area');
-        console.log('  ✅ macOS - Menu bar with template icons');
-        console.log('  ✅ Linux - System tray integration');
-      }
-      
-    } catch (error) {
-      console.error('❌ Tray operation failed:', error);
-      process.exit(1);
-    }
-  });
-
-// GitHub Login Command
-program
-  .command('login')
-  .description('GitHub authentication using device flow')
-  .option('-s, --status', 'show current login status')
-  .option('--logout', 'logout from GitHub')
-  .addHelpText('after', `
-Examples:
-  gitswitch login           Start GitHub authentication
-  gitswitch login --status  Check login status
-  gitswitch login --logout  Logout from GitHub
-  `)
-  .action(async (options) => {
-    try {
-      if (options.status) {
-        // Show current login status
-        console.log('🔐 GitHub Authentication Status\n');
-        
-        const accounts = storageManager.getAccounts();
-        const githubAccounts = accounts.filter(account => 
-          account.oauthProvider === 'github' && account.oauthToken
-        );
-        
-        if (githubAccounts.length === 0) {
-          console.log('❌ Not logged in to GitHub');
-          console.log('💡 Run `gitswitch login` to authenticate with GitHub');
-        } else {
-          console.log(`✅ Logged in to GitHub (${githubAccounts.length} account${githubAccounts.length > 1 ? 's' : ''})\n`);
-          
-          githubAccounts.forEach((account, index) => {
-            console.log(`${index + 1}. ${account.name} (${account.email})`);
-            if (account.avatarUrl) {
-              console.log(`   Profile: ${account.profileUrl || 'N/A'}`);
-            }
-            console.log(`   Added: ${account.createdAt ? new Date(account.createdAt).toLocaleDateString() : 'Unknown'}`);
-            console.log('');
-          });
-        }
-        
-        return;
-      }
-      
-      if (options.logout) {
-        // Logout from GitHub
-        const accounts = storageManager.getAccounts();
-        const githubAccounts = accounts.filter(account => 
-          account.oauthProvider === 'github' && account.oauthToken
-        );
-        
-        if (githubAccounts.length === 0) {
-          console.log('❌ Not logged in to GitHub');
-          return;
-        }
-        
-        console.log('🔓 Logging out from GitHub...\n');
-        
-        for (const account of githubAccounts) {
-          // Remove OAuth token data
-          const updatedAccount = { ...account };
-          delete updatedAccount.oauthToken;
-          delete updatedAccount.oauthRefreshToken;
-          delete updatedAccount.oauthExpiry;
-          
-          storageManager.updateAccount(account.id, updatedAccount);
-        }
-        
-        console.log(`✅ Successfully logged out from ${githubAccounts.length} GitHub account${githubAccounts.length > 1 ? 's' : ''}`);
-        return;
-      }
-      
-      // Start GitHub device flow authentication
-      console.log('🚀 Starting GitHub authentication...\n');
-      
+    let lastAccessedText = 'Unknown';
+    if (project.lastAccessed) {
       try {
-        const account = await oauthManager.authenticateWithProvider('github');
-        
-        console.log('\n🎉 GitHub authentication successful!\n');
-        console.log(`✅ Account: ${account.name} (${account.email})`);
-        console.log(`🔗 Profile: ${account.profileUrl || 'N/A'}`);
-        console.log(`📧 Email verified: ${account.verified ? 'Yes' : 'No'}`);
-        
-        console.log('\n💡 You can now use GitSwitch with your GitHub account!');
-        console.log('   • Your account has been saved securely');
-        console.log('   • Use `gitswitch accounts --list` to see all accounts');
-        console.log('   • Use `gitswitch login --status` to check login status');
-        
-      } catch (error: any) {
-        console.error('\n❌ GitHub authentication failed:', error.message);
-        
-        if (error.message.includes('timeout')) {
-          console.log('\n💡 Authentication timed out. Please try again.');
-        } else if (error.message.includes('not configured')) {
-          console.log('\n💡 GitHub OAuth is not configured.');
-          console.log('   Please check the GitHub OAuth setup documentation.');
-        } else {
-          console.log('\n💡 Please try again or check your internet connection.');
-        }
-        
-        process.exit(1);
+        const lastAccessedDate = project.lastAccessed instanceof Date ? project.lastAccessed : new Date(project.lastAccessed);
+        lastAccessedText = lastAccessedDate.toLocaleDateString();
+      } catch (error) {
+        lastAccessedText = 'Invalid date';
       }
-      
-    } catch (error) {
-      console.error('❌ Login command failed:', error);
-      process.exit(1);
     }
-  });
+    console.log(`   Last accessed: ${lastAccessedText}`);
+    console.log('');
+  }
+}
 
+function displayAccounts(accounts: any[]) {
+  console.log(`👤 Found ${accounts.length} account(s):\n`);
+
+  for (const account of accounts) {
+    console.log(`👤 ${account.name}${account.isDefault ? ' (default)' : ''}`);
+    console.log(`   Email: ${account.email}`);
+    console.log(`   Git Name: ${account.gitName}`);
+    if (account.description) {
+      console.log(`   Description: ${account.description}`);
+    }
+    console.log(`   Usage: ${account.usageCount} times`);
+
+    let lastUsedText = 'Never';
+    if (account.lastUsed) {
+      try {
+        const lastUsedDate = account.lastUsed instanceof Date ? account.lastUsed : new Date(account.lastUsed);
+        lastUsedText = lastUsedDate.toLocaleDateString();
+      } catch (error) {
+        lastUsedText = 'Invalid date';
+      }
+    }
+    console.log(`   Last used: ${lastUsedText}`);
+    console.log('');
+  }
+}
 
 // Parse CLI arguments
 program.parse();
@@ -1992,159 +997,4 @@ program.parse();
 // If no command provided, show help
 if (!process.argv.slice(2).length) {
   program.outputHelp();
-}
-
-/**
- * Launch the desktop application with the specified project path
- */
-async function launchDesktopApp(projectPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    console.log('🚀 Launching GitSwitch desktop app...');
-    console.log('📝 This will open the desktop interface for managing git identities');
-    
-    try {
-      let desktopAppPath = '';
-      let desktopDir = '';
-      
-      // Try possible locations for desktop app (in order of preference)
-      const possiblePaths = [
-        // Development environment - relative to CLI location
-        path.resolve(__dirname, '../../desktop/dist/main.js'),
-        // Development environment - from package root
-        path.resolve(__dirname, '../../../desktop/dist/main.js'),
-        // Global installation paths
-        path.resolve(process.cwd(), 'node_modules/gitswitch/desktop/dist/main.js'),
-        // Alternative global paths
-        path.resolve(__dirname, '../../../../desktop/dist/main.js')
-      ];
-        
-      // Find the first existing desktop app path
-      for (const possiblePath of possiblePaths) {
-        if (fs.existsSync(possiblePath)) {
-          desktopAppPath = possiblePath;
-          desktopDir = path.dirname(path.dirname(possiblePath)); // Go up from dist/main.js to desktop/
-          console.log(`💡 Found desktop app at: ${possiblePath}`);
-          break;
-        }
-      }
-      
-      // Check if the desktop app exists
-      if (!desktopAppPath || !fs.existsSync(desktopAppPath)) {
-        console.error('❌ Desktop app not found at any of the expected locations.');
-        console.log('🔍 Searched locations:');
-        possiblePaths.forEach((searchPath, index) => {
-          console.log(`   ${index + 1}. ${searchPath} ${fs.existsSync(searchPath) ? '✅' : '❌'}`);
-        });
-        throw new Error('Desktop app not found. Please run: npm run build:desktop');
-      }
-      
-      console.log(`📂 Found desktop app at: ${desktopAppPath}`);
-      console.log(`📁 Desktop directory: ${desktopDir}`);
-      
-      // Use spawn instead of exec for better process control
-      const { spawn } = require('child_process');
-      
-      let launchSuccess = false;
-      
-      // Try multiple launch strategies
-      const launchStrategies = [
-        // Strategy 1: Use npx electron (most reliable)
-        {
-          name: 'npx electron',
-          command: 'npx',
-          args: ['electron', path.join('dist', 'main.js'), '--project', projectPath],
-          options: { cwd: desktopDir, detached: true, stdio: ['ignore', 'pipe', 'pipe'], shell: true }
-        },
-        // Strategy 2: Try global electron
-        {
-          name: 'global electron',
-          command: 'electron',
-          args: [path.join('dist', 'main.js'), '--project', projectPath],
-          options: { cwd: desktopDir, detached: true, stdio: ['ignore', 'pipe', 'pipe'], shell: true }
-        },
-        // Strategy 3: Try node with local electron
-        {
-          name: 'node via npm start',
-          command: 'npm',
-          args: ['start', '--', '--project', projectPath],
-          options: { cwd: desktopDir, detached: true, stdio: ['ignore', 'pipe', 'pipe'], shell: true }
-        }
-      ];
-      
-      let strategyIndex = 0;
-      
-      const tryNextStrategy = () => {
-        if (strategyIndex >= launchStrategies.length) {
-          throw new Error('All launch strategies failed');
-        }
-        
-        const strategy = launchStrategies[strategyIndex];
-        console.log(`🔧 Attempting launch strategy ${strategyIndex + 1}: ${strategy.name}`);
-        console.log(`🔧 Executing: ${strategy.command} ${strategy.args.join(' ')}`);
-        console.log(`📁 Working directory: ${desktopDir}`);
-        
-        const child = spawn(strategy.command, strategy.args, strategy.options);
-      
-        // Log output for debugging
-        child.stdout?.on('data', (data: any) => {
-          console.log(`Desktop app output: ${data}`);
-        });
-        
-        child.stderr?.on('data', (data: any) => {
-          const message = data.toString();
-          // Ignore GPU process warnings
-          if (!message.includes('GPU process exited') && !message.includes('gpu_process_host')) {
-            console.error(`Desktop app error: ${message}`);
-          }
-        });
-        
-        child.on('error', (error: any) => {
-          console.error(`❌ Strategy ${strategyIndex + 1} failed:`, error.message);
-          strategyIndex++;
-          if (strategyIndex < launchStrategies.length) {
-            console.log(`⏭️  Trying next launch strategy...`);
-            setTimeout(tryNextStrategy, 1000);
-          } else {
-            console.error('❌ All launch strategies failed');
-            reject(new Error('Could not launch desktop app with any available method'));
-          }
-        });
-        
-        child.on('spawn', () => {
-          console.log(`✅ Desktop app launched successfully with strategy: ${strategy.name}`);
-          launchSuccess = true;
-          // Detach the child process so it runs independently
-          child.unref();
-          resolve();
-        });
-        
-        // Timeout for this strategy
-        setTimeout(() => {
-          if (!launchSuccess) {
-            console.log(`⏱️  Strategy ${strategyIndex + 1} timed out, trying next...`);
-            child.kill();
-            strategyIndex++;
-            if (strategyIndex < launchStrategies.length) {
-              tryNextStrategy();
-            } else {
-              reject(new Error('All launch strategies timed out'));
-            }
-          }
-        }, 5000);
-      };
-      
-      // Start with the first strategy
-      tryNextStrategy();
-      
-    } catch (error: any) {
-      console.error('❌ Failed to launch desktop app:', error.message);
-      console.log('💡 Troubleshooting steps:');
-      console.log('   1. Run: npm run build:desktop');
-      console.log(`   2. Ensure desktop app is built in ${path.join('dist')} folder`);
-      console.log('   3. Install electron globally: npm install -g electron');
-      console.log(`   4. Try manual launch: cd ${path.join('packages', 'desktop')} && npm start`);
-      console.log('   5. Check if Node.js and npm are properly installed');
-      reject(error);
-    }
-  });
 }
