@@ -318,12 +318,16 @@ export type IPCEvent =
   | { type: 'SHOW_TRAY_NOTIFICATION'; payload: { title: string; content: string; silent?: boolean } }
   | { type: 'MINIMIZE_TO_TRAY'; payload: null }
   
-  // OAuth Authentication
+  // OAuth Authentication (New Protocol-Based Flow)
   | { type: 'GET_OAUTH_PROVIDERS'; payload: null }
-  | { type: 'START_OAUTH_FLOW'; payload: { provider: 'github' | 'gitlab' | 'bitbucket' | 'azure' } }
+  | { type: 'GITHUB_START_AUTH'; payload: { provider: 'github' | 'gitlab' | 'bitbucket' | 'azure' } }
+  | { type: 'GITHUB_AUTH_COMPLETE'; payload: { code: string; state: string; provider: string } }
   | { type: 'OAUTH_CALLBACK'; payload: { code: string; state: string; provider: string } }
   | { type: 'REFRESH_OAUTH_TOKEN'; payload: { accountId: string } }
-  | { type: 'REVOKE_OAUTH_TOKEN'; payload: { accountId: string } };
+  | { type: 'REVOKE_OAUTH_TOKEN'; payload: { accountId: string } }
+  
+  // Legacy OAuth (for backward compatibility)
+  | { type: 'START_OAUTH_FLOW'; payload: { provider: 'github' | 'gitlab' | 'bitbucket' | 'azure' } };
 
 export type IPCResponse<T = any> = {
   success: boolean;

@@ -12,6 +12,26 @@ export declare class StorageManager {
     private readonly patternsFile;
     constructor();
     /**
+     * Validate account data before saving
+     */
+    private validateAccount;
+    /**
+     * Validate account update data
+     */
+    private validateAccountUpdate;
+    /**
+     * Validate project data before saving
+     */
+    private validateProject;
+    /**
+     * Validate pattern data before saving
+     */
+    private validatePattern;
+    /**
+     * Validate pattern update data
+     */
+    private validatePatternUpdate;
+    /**
      * Get all stored accounts
      */
     getAccounts(): GitAccount[];
