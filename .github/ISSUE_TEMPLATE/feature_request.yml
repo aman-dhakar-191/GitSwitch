@@ -1,0 +1,129 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for GitSwitch
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please provide as much detail as possible to help us understand your request.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What is the current limitation?
+      placeholder: Describe the problem or limitation you're experiencing
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+      placeholder: Describe your ideal solution
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: Describe alternative approaches you've considered
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Development Stage
+      description: Which development stage would this feature fit into?
+      options:
+        - Stage 1 (MVP/Core Features)
+        - Stage 2 (Enhanced Features)
+        - Stage 3 (Advanced Features)
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Level
+      description: How important is this feature to you?
+      options:
+        - Low - Nice to have
+        - Medium - Would improve my workflow
+        - High - Critical for my use case
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: feature-type
+    attributes:
+      label: Feature Type
+      description: What type of feature is this? (Select all that apply)
+      options:
+        - label: CLI command or option
+        - label: Desktop app UI/UX
+        - label: Core functionality
+        - label: Integration with external tools
+        - label: Performance improvement
+        - label: Developer experience
+        - label: Documentation
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe a specific scenario where this feature would be useful
+      placeholder: "As a developer who..., I want to..., so that..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: What would need to be true for this feature to be considered complete?
+      placeholder: |
+        - Feature should...
+        - User should be able to...
+        - System should...
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups/Examples
+      description: If applicable, provide mockups, code examples, or references to similar features
+      placeholder: Paste links, code examples, or describe UI mockups
+
+  - type: input
+    id: implementation
+    attributes:
+      label: Implementation Ideas
+      description: Do you have any ideas about how this could be implemented?
+      placeholder: Optional technical suggestions
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be interested in contributing to this feature?
+      options:
+        - label: I would like to work on implementing this feature
+        - label: I can help with testing this feature
+        - label: I can help with documentation for this feature
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues to avoid duplicates
+          required: true
+        - label: I have checked the roadmap to see if this is already planned
+          required: true
+        - label: This feature aligns with GitSwitch's core purpose of git identity management
+          required: true

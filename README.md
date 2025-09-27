@@ -1,5 +1,13 @@
 # GitSwitch
 
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
+[![CI](https://github.com/aman-dhakar-191/GitSwitch/workflows/CI%20-%20Build%20and%20Test/badge.svg)](https://github.com/aman-dhakar-191/GitSwitch/actions)
+[![npm version](https://badge.fury.io/js/gitswitch.svg)](https://www.npmjs.com/package/gitswitch)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+[![GitHub issues](https://img.shields.io/github/issues/aman-dhakar-191/GitSwitch)](https://github.com/aman-dhakar-191/GitSwitch/issues)
+[![GitHub stars](https://img.shields.io/github/stars/aman-dhakar-191/GitSwitch)](https://github.com/aman-dhakar-191/GitSwitch/stargazers)
+
 A lightweight git identity management tool that eliminates context switching friction for developers working with multiple accounts.
 
 ## 🎯 Overview
@@ -240,13 +248,58 @@ GitSwitch follows a staged development approach. See the development guide and s
 - `scripts/` - Development, testing, and release scripts
 - `packages/` - Core codebase (CLI, desktop app, shared libraries)
 
+## 🤝 Contributing
+
+We welcome contributions from developers of all skill levels! GitSwitch is open source and built by the community.
+
+### How to Contribute
+
+1. **🍴 Fork the repository** and create your feature branch
+2. **🔧 Set up development environment** - see [CONTRIBUTING.md](./CONTRIBUTING.md)
+3. **✨ Make your changes** following our development guide
+4. **🧪 Add tests** for your changes
+5. **📝 Update documentation** if needed
+6. **🚀 Submit a pull request**
+
+### Development Resources
+
+- [Contributing Guide](./CONTRIBUTING.md) - Detailed contribution instructions
+- [Development Guide](./docs/development-guide.md) - Stage-based development workflow
+- [Code of Conduct](./CODE_OF_CONDUCT.md) - Community guidelines
+- [Security Policy](./SECURITY.md) - How to report security issues
+
+### Quick Links
+
+- 🐛 [Report a Bug](https://github.com/aman-dhakar-191/GitSwitch/issues/new?template=bug_report.yml)
+- ✨ [Request a Feature](https://github.com/aman-dhakar-191/GitSwitch/issues/new?template=feature_request.yml)
+- ❓ [Ask a Question](https://github.com/aman-dhakar-191/GitSwitch/issues/new?template=question.yml)
+- 💬 [Join Discussions](https://github.com/aman-dhakar-191/GitSwitch/discussions)
+
+## 👥 Contributors
+
+Thanks to all the amazing people who have contributed to GitSwitch! 🙏
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
 ## 📄 License
 
-MIT License - see LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
 ## 🆘 Support
 
-For issues, questions, or feature requests, please open an issue on GitHub.
+- 📖 **Documentation**: Check our [docs](./docs/) folder
+- 🐛 **Bug Reports**: Use our [issue templates](https://github.com/aman-dhakar-191/GitSwitch/issues/new/choose)
+- 💬 **Questions**: Start a [discussion](https://github.com/aman-dhakar-191/GitSwitch/discussions)
+- 🔒 **Security**: See our [security policy](./SECURITY.md)
+
+## ⭐ Show Your Support
+
+If GitSwitch helps you manage your git identities, please consider:
+- ⭐ Starring the repository
+- 🔄 Sharing it with others
+- 🤝 Contributing to the project
+- 💖 [Sponsoring the project](https://github.com/sponsors/aman-dhakar-191)
 
 ---
 
