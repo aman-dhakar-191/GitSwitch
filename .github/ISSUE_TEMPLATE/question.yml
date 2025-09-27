@@ -1,0 +1,76 @@
+name: Question
+description: Ask a question about GitSwitch usage, configuration, or development
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about GitSwitch? We're here to help! Please provide as much context as possible.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: Ask your question here
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Question Category
+      description: What category does your question fall into?
+      options:
+        - Installation and Setup
+        - CLI Usage
+        - Desktop App Usage
+        - Configuration
+        - Troubleshooting
+        - Development/Contributing
+        - Feature Capabilities
+        - Best Practices
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide any relevant context about your setup, what you're trying to achieve, or what you've already tried
+      placeholder: |
+        - Operating System: 
+        - GitSwitch Version: 
+        - What I'm trying to do: 
+        - What I've tried so far:
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What You're Trying to Achieve
+      description: Describe your end goal or what you're hoping to accomplish
+      placeholder: I want to...
+
+  - type: textarea
+    id: research
+    attributes:
+      label: Research Done
+      description: Have you checked the documentation, existing issues, or other resources?
+      placeholder: |
+        - [ ] Checked README.md
+        - [ ] Checked documentation in docs/ folder
+        - [ ] Searched existing issues
+        - [ ] Tried GitSwitch --help
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues and discussions
+          required: true
+        - label: I have provided sufficient context for my question
+          required: true

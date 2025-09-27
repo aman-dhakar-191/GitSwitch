@@ -29,5 +29,16 @@
     "rimraf": "^5.0.0",
     "ts-jest": "^29.0.0",
     "typescript": "^5.0.0"
-  }
+  },
+  "license": "MIT",
+  "author": "GitSwitch Team",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aman-dhakar-191/GitSwitch.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/aman-dhakar-191/GitSwitch/issues"
+  },
+  "homepage": "https://github.com/aman-dhakar-191/GitSwitch#readme"
 }
