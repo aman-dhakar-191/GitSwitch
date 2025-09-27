@@ -88,6 +88,7 @@ program
         // Show available commands
         console.log('\n⚡ Available Commands:');
         console.log('   gitswitch status          Show detailed status');
+        console.log('   gitswitch login           GitHub authentication');
         console.log('   gitswitch accounts        Manage git accounts');
         console.log('   gitswitch list            List all projects');
         console.log('   gitswitch scan            Scan for projects');
@@ -1693,6 +1694,12 @@ program
     .description('GitHub authentication using device flow')
     .option('-s, --status', 'show current login status')
     .option('--logout', 'logout from GitHub')
+    .addHelpText('after', `
+Examples:
+  gitswitch login           Start GitHub authentication
+  gitswitch login --status  Check login status
+  gitswitch login --logout  Logout from GitHub
+  `)
     .action(async (options) => {
     try {
         if (options.status) {
