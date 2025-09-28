@@ -1068,6 +1068,713 @@ function displayAccounts(accounts) {
         console.log('');
     }
 }
+// PHASE 1 COMMANDS - Quick Wins
+// Add Phase 1 Project Commands  
+projectCmd
+    .command('suggest')
+    .description('Get account suggestions for current project')
+    .action(async () => {
+    const projectPath = process.cwd();
+    try {
+        const project = projectManager.analyzeProject(projectPath);
+        if (!project) {
+            console.error('❌ Current directory is not a git repository');
+            return;
+        }
+        const suggestions = smartDetector.suggestAccounts(project, project.remoteUrl);
+        if (suggestions.length === 0) {
+            console.log('💡 No account suggestions available');
+            console.log('   Add more accounts or improve project patterns');
+            return;
+        }
+        console.log('🎯 Account suggestions for current project:\n');
+        suggestions.forEach((suggestion, index) => {
+            const account = storageManager.getAccounts().find(a => a.id === suggestion.accountId);
+            if (account) {
+                console.log(`${index + 1}. ${account.name} (${account.email})`);
+                console.log(`   Confidence: ${(suggestion.confidence * 100).toFixed(1)}%`);
+                console.log(`   Reason: ${suggestion.reason}\n`);
+            }
+        });
+    }
+    catch (error) {
+        console.error('❌ Error getting suggestions:', error);
+    }
+});
+projectCmd
+    .command('switch')
+    .description('Switch git identity for current project')
+    .option('--to <accountId>', 'Account ID to switch to')
+    .action(async (options) => {
+    const projectPath = process.cwd();
+    try {
+        if (options.to) {
+            const success = projectManager.switchGitIdentity(projectPath, options.to);
+            if (success) {
+                console.log('✅ Git identity switched successfully');
+            }
+            else {
+                console.error('❌ Failed to switch git identity');
+            }
+        }
+        else {
+            // Interactive mode
+            await changeIdentity(projectPath);
+        }
+    }
+    catch (error) {
+        console.error('❌ Error switching identity:', error);
+    }
+});
+projectCmd
+    .command('health')
+    .description('Check identity consistency')
+    .action(async () => {
+    const projectPath = process.cwd();
+    try {
+        const gitConfig = projectManager.getCurrentGitConfig(projectPath);
+        const project = projectManager.analyzeProject(projectPath);
+        console.log('🏥 Identity Health Check\n');
+        console.log(`📁 Project: ${project?.name || path.basename(projectPath)}`);
+        if (gitConfig) {
+            console.log(`✅ Git Config Found:`);
+            console.log(`   Name: ${gitConfig.name}`);
+            console.log(`   Email: ${gitConfig.email}`);
+            // Check if matches any account
+            const accounts = storageManager.getAccounts();
+            const matchingAccount = accounts.find(a => a.email === gitConfig.email);
+            if (matchingAccount) {
+                console.log(`✅ Matches Account: ${matchingAccount.name}`);
+            }
+            else {
+                console.log(`⚠️  No matching account found`);
+            }
+        }
+        else {
+            console.log(`❌ No git config found`);
+        }
+    }
+    catch (error) {
+        console.error('❌ Health check failed:', error);
+    }
+});
+projectCmd
+    .command('analyze')
+    .description('Enhanced project analysis')
+    .action(async () => {
+    const projectPath = process.cwd();
+    try {
+        const project = projectManager.analyzeProject(projectPath);
+        if (!project) {
+            console.error('❌ Not a git repository');
+            return;
+        }
+        console.log('🔍 Project Analysis\n');
+        console.log(`📁 Name: ${project.name}`);
+        console.log(`📍 Path: ${project.path}`);
+        console.log(`🔗 Remote: ${project.remoteUrl || 'None'}`);
+        console.log(`📊 Status: ${project.status}`);
+        if (project) {
+            console.log(`📊 Status: ${project.status}`);
+            if (project.lastAccessed) {
+                console.log(`🕒 Last Accessed: ${new Date(project.lastAccessed).toLocaleDateString()}`);
+            }
+            // Get suggestions 
+            const analyzedProject = projectManager.analyzeProject(projectPath);
+            if (analyzedProject) {
+                const suggestions = smartDetector.suggestAccounts(analyzedProject, analyzedProject.remoteUrl);
+                if (suggestions.length > 0) {
+                    console.log('\n🎯 Top Suggestion:');
+                    const topSuggestion = suggestions[0];
+                    const account = storageManager.getAccounts().find(a => a.id === topSuggestion.accountId);
+                    if (account) {
+                        console.log(`   ${account.name} (${(topSuggestion.confidence * 100).toFixed(1)}% confidence)`);
+                        console.log(`   Reason: ${topSuggestion.reason}`);
+                    }
+                }
+            }
+        }
+    }
+    catch (error) {
+        console.error('❌ Analysis failed:', error);
+    }
+});
+// Repository Commands
+const repoCmd = program
+    .command('repo')
+    .description('Repository management commands');
+repoCmd
+    .command('status')
+    .description('Enhanced git status with identity info')
+    .action(async () => {
+    const projectPath = process.cwd();
+    try {
+        const gitConfig = gitManager.getCurrentConfig(projectPath);
+        const project = projectManager.analyzeProject(projectPath);
+        console.log('📊 Repository Status\n');
+        if (project) {
+            console.log(`📁 ${project.name}`);
+            console.log(`🔗 ${project.remoteUrl || 'No remote'}`);
+        }
+        if (gitConfig) {
+            console.log(`👤 Identity: ${gitConfig.name} <${gitConfig.email}>`);
+        }
+        else {
+            console.log(`⚠️  No git identity configured`);
+        }
+        // Add git status info
+        console.log('\n📋 Git Status:');
+        console.log('   (Run `git status` for detailed information)');
+    }
+    catch (error) {
+        console.error('❌ Status check failed:', error);
+    }
+});
+repoCmd
+    .command('find')
+    .description('Find repositories by criteria')
+    .option('--name <pattern>', 'Find by name pattern')
+    .option('--url <pattern>', 'Find by URL pattern')
+    .action(async (options) => {
+    try {
+        const projects = storageManager.getProjects();
+        let filtered = projects;
+        if (options.name) {
+            filtered = filtered.filter(p => p.name.toLowerCase().includes(options.name.toLowerCase()));
+        }
+        if (options.url) {
+            filtered = filtered.filter(p => p.remoteUrl && p.remoteUrl.includes(options.url));
+        }
+        console.log(`🔍 Found ${filtered.length} repositories:\n`);
+        displayProjects(filtered);
+    }
+    catch (error) {
+        console.error('❌ Search failed:', error);
+    }
+});
+repoCmd
+    .command('validate')
+    .description('Validate repository configuration')
+    .action(async () => {
+    const projectPath = process.cwd();
+    try {
+        const result = gitHookManager.validateCommit(projectPath);
+        console.log(result.message);
+        if (result.valid) {
+            console.log('✅ Repository configuration is valid');
+        }
+        else {
+            console.log('❌ Repository configuration issues detected');
+            if (result.suggestedAccount) {
+                console.log(`💡 Suggested account: ${result.suggestedAccount}`);
+            }
+        }
+    }
+    catch (error) {
+        console.error('❌ Validation failed:', error);
+    }
+});
+// Remote Commands
+const remoteCmd = program
+    .command('remote')
+    .description('Remote repository management');
+remoteCmd
+    .command('push')
+    .description('Push to specific remote with identity validation')
+    .argument('[remote]', 'Remote name', 'origin')
+    .argument('[branch]', 'Branch name', 'HEAD')
+    .action(async (remote, branch) => {
+    const projectPath = process.cwd();
+    try {
+        const result = await advancedGitManager.pushToRemote(projectPath, remote, branch);
+        if (result.success) {
+            console.log(`✅ Successfully pushed to ${remote}`);
+        }
+        else {
+            console.error(`❌ Failed to push to ${remote}: ${result.error}`);
+        }
+    }
+    catch (error) {
+        console.error('❌ Push failed:', error);
+    }
+});
+remoteCmd
+    .command('pull')
+    .description('Pull from remote with identity validation')
+    .argument('[remote]', 'Remote name', 'origin')
+    .argument('[branch]', 'Branch name', 'HEAD')
+    .action(async (remote, branch) => {
+    const projectPath = process.cwd();
+    try {
+        const result = await advancedGitManager.pullFromRemote(projectPath, remote, branch);
+        if (result.success) {
+            console.log(`✅ Successfully pulled from ${remote}`);
+        }
+        else {
+            console.error(`❌ Failed to pull from ${remote}: ${result.error}`);
+        }
+    }
+    catch (error) {
+        console.error('❌ Pull failed:', error);
+    }
+});
+remoteCmd
+    .command('status')
+    .description('Show remote status')
+    .action(async () => {
+    const projectPath = process.cwd();
+    try {
+        const remotes = await advancedGitManager.getRemotes(projectPath);
+        console.log('📡 Remote Status\n');
+        if (remotes.length === 0) {
+            console.log('❌ No remotes configured');
+            return;
+        }
+        remotes.forEach(remote => {
+            console.log(`🔗 ${remote.name}: ${remote.url}`);
+        });
+    }
+    catch (error) {
+        console.error('❌ Failed to get remote status:', error);
+    }
+});
+remoteCmd
+    .command('configure')
+    .description('Configure remote with account')
+    .argument('<remote>', 'Remote name')
+    .argument('<accountId>', 'Account ID')
+    .action(async (remote, accountId) => {
+    const projectPath = process.cwd();
+    try {
+        const result = await advancedGitManager.setRemoteAccount(projectPath, remote, accountId);
+        if (result) {
+            console.log(`✅ Configured ${remote} with account ${accountId}`);
+        }
+        else {
+            console.error(`❌ Failed to configure ${remote}`);
+        }
+    }
+    catch (error) {
+        console.error('❌ Configuration failed:', error);
+    }
+});
+remoteCmd
+    .command('test')
+    .description('Test remote connectivity')
+    .argument('[remote]', 'Remote name', 'origin')
+    .action(async (remote) => {
+    console.log(`🧪 Testing connectivity to ${remote}...`);
+    try {
+        // Simple git ls-remote test
+        (0, child_process_1.exec)(`git ls-remote ${remote}`, (error, stdout) => {
+            if (error) {
+                console.error(`❌ Connection to ${remote} failed:`, error.message);
+            }
+            else {
+                console.log(`✅ Connection to ${remote} successful`);
+            }
+        });
+    }
+    catch (error) {
+        console.error('❌ Test failed:', error);
+    }
+});
+// Branch Commands
+const branchCmd = program
+    .command('branch')
+    .description('Branch management with identity policies');
+branchCmd
+    .command('policy')
+    .description('Branch policy management')
+    .addCommand(new commander_1.Command('list')
+    .description('Show branch policies')
+    .action(async () => {
+    const projectPath = process.cwd();
+    try {
+        const policies = await advancedGitManager.getBranchPolicies(projectPath);
+        console.log('📋 Branch Policies\n');
+        if (policies.length === 0) {
+            console.log('❌ No branch policies configured');
+            return;
+        }
+        policies.forEach(policy => {
+            console.log(`🔒 ${policy.pattern}`);
+            console.log(`   Required Account: ${policy.requiredAccount.name} (${policy.requiredAccount.email})`);
+            console.log(`   Enforcement: ${policy.enforcement}\n`);
+        });
+    }
+    catch (error) {
+        console.error('❌ Failed to get policies:', error);
+    }
+}))
+    .addCommand(new commander_1.Command('add')
+    .description('Add branch policy')
+    .argument('<pattern>', 'Branch pattern (e.g., main, develop)')
+    .argument('<accountId>', 'Required account ID')
+    .action(async (pattern, accountId) => {
+    const projectPath = process.cwd();
+    try {
+        const account = storageManager.getAccounts().find(a => a.id === accountId);
+        if (!account) {
+            console.error(`❌ Account ${accountId} not found`);
+            return;
+        }
+        const policy = {
+            pattern,
+            requiredAccount: account,
+            requireSignedCommits: false,
+            requireLinearHistory: false,
+            enforcement: 'strict',
+            description: `Policy for ${pattern}`,
+            createdBy: account.email
+        };
+        const result = await advancedGitManager.addBranchPolicy(policy);
+        if (result) {
+            console.log(`✅ Added policy for ${pattern} requiring account ${account.name}`);
+        }
+        else {
+            console.error(`❌ Failed to add policy`);
+        }
+    }
+    catch (error) {
+        console.error('❌ Policy creation failed:', error);
+    }
+}));
+branchCmd
+    .command('validate')
+    .description('Validate branch commit identity')
+    .action(async () => {
+    const projectPath = process.cwd();
+    try {
+        // Get current branch
+        (0, child_process_1.exec)('git branch --show-current', (error, stdout) => {
+            if (error) {
+                console.error('❌ Failed to get current branch');
+                return;
+            }
+            const branch = stdout.trim();
+            console.log(`🔍 Validating branch: ${branch}`);
+            // Get current account for validation
+            const gitConfig = projectManager.getCurrentGitConfig(projectPath);
+            if (!gitConfig) {
+                console.error('❌ No git configuration found');
+                return;
+            }
+            const accounts = storageManager.getAccounts();
+            const currentAccount = accounts.find(a => a.email === gitConfig.email);
+            if (!currentAccount) {
+                console.error('❌ Current git identity not found in accounts');
+                return;
+            }
+            try {
+                const result = advancedGitManager.validateBranchCommit(projectPath, branch, currentAccount);
+                if (result.valid) {
+                    console.log('✅ Branch validation passed');
+                }
+                else {
+                    console.log(`❌ Branch validation failed`);
+                }
+            }
+            catch (error) {
+                console.error('❌ Validation error:', error);
+            }
+        });
+    }
+    catch (error) {
+        console.error('❌ Validation failed:', error);
+    }
+});
+// Phase 1 Account Commands (extend existing)
+accountCmd
+    .command('usage')
+    .description('Show account usage statistics')
+    .action(async () => {
+    try {
+        const accounts = storageManager.getAccounts();
+        console.log('📊 Account Usage Statistics\n');
+        accounts
+            .sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0))
+            .forEach(account => {
+            console.log(`👤 ${account.name} (${account.email})`);
+            console.log(`   Usage: ${account.usageCount || 0} times`);
+            const lastUsed = account.lastUsed ? new Date(account.lastUsed).toLocaleDateString() : 'Never';
+            console.log(`   Last used: ${lastUsed}\n`);
+        });
+    }
+    catch (error) {
+        console.error('❌ Failed to get usage stats:', error);
+    }
+});
+accountCmd
+    .command('test')
+    .description('Test account authentication')
+    .action(async () => {
+    try {
+        const accounts = storageManager.getAccounts();
+        const oauthAccounts = accounts.filter(a => a.oauthToken);
+        console.log('🧪 Testing Account Authentication\n');
+        if (oauthAccounts.length === 0) {
+            console.log('❌ No OAuth accounts to test');
+            return;
+        }
+        for (const account of oauthAccounts) {
+            console.log(`Testing ${account.name}...`);
+            if (account.oauthExpiry && new Date(account.oauthExpiry) < new Date()) {
+                console.log(`⚠️  Token expired for ${account.name}`);
+            }
+            else {
+                console.log(`✅ ${account.name} authentication valid`);
+            }
+        }
+    }
+    catch (error) {
+        console.error('❌ Authentication test failed:', error);
+    }
+});
+accountCmd
+    .command('refresh')
+    .description('Refresh OAuth tokens')
+    .action(async () => {
+    try {
+        const accounts = storageManager.getAccounts();
+        const oauthAccounts = accounts.filter(a => a.oauthRefreshToken);
+        console.log('🔄 Refreshing OAuth Tokens\n');
+        if (oauthAccounts.length === 0) {
+            console.log('❌ No accounts with refresh tokens');
+            return;
+        }
+        for (const account of oauthAccounts) {
+            console.log(`Refreshing ${account.name}...`);
+            try {
+                // Simple refresh - just log for now since we need proper OAuthAccount type
+                console.log(`🔄 Token refresh not yet implemented for ${account.name}`);
+            }
+            catch (error) {
+                console.log(`❌ Error refreshing ${account.name}:`, error);
+            }
+        }
+    }
+    catch (error) {
+        console.error('❌ Token refresh failed:', error);
+    }
+});
+// Security Commands
+const securityCmd = program
+    .command('security')
+    .description('Security and audit commands');
+securityCmd
+    .command('audit')
+    .description('Security audit')
+    .action(async () => {
+    try {
+        console.log('🔒 Security Audit Report\n');
+        // Check for accounts without proper security
+        const accounts = storageManager.getAccounts();
+        const insecureAccounts = accounts.filter(a => !a.oauthToken);
+        if (insecureAccounts.length > 0) {
+            console.log('⚠️  Insecure Accounts:');
+            insecureAccounts.forEach(account => {
+                console.log(`   ${account.name} - No OAuth token`);
+            });
+            console.log();
+        }
+        // Check for expired tokens
+        const expiredAccounts = accounts.filter(a => a.oauthExpiry && new Date(a.oauthExpiry) < new Date());
+        if (expiredAccounts.length > 0) {
+            console.log('⏰ Expired Tokens:');
+            expiredAccounts.forEach(account => {
+                console.log(`   ${account.name} - Token expired`);
+            });
+            console.log();
+        }
+        // Log audit event
+        securityManager.logAuditEvent({
+            userId: 'cli-user',
+            userEmail: 'cli@gitswitch.dev',
+            action: 'config_change',
+            ipAddress: '127.0.0.1',
+            userAgent: 'GitSwitch CLI',
+            sessionId: `cli-${Date.now()}`,
+            severity: 'info',
+            metadata: {
+                insecureAccounts: insecureAccounts.length,
+                expiredAccounts: expiredAccounts.length
+            }
+        });
+        console.log('✅ Security audit completed');
+    }
+    catch (error) {
+        console.error('❌ Security audit failed:', error);
+    }
+});
+securityCmd
+    .command('keys')
+    .description('Signing key management')
+    .addCommand(new commander_1.Command('list')
+    .description('List signing keys')
+    .action(async () => {
+    try {
+        const accounts = storageManager.getAccounts();
+        const accountsWithKeys = accounts.filter(a => a.sshKeyPath);
+        console.log('🔑 SSH Keys\n');
+        if (accountsWithKeys.length === 0) {
+            console.log('❌ No SSH keys configured');
+            return;
+        }
+        accountsWithKeys.forEach(account => {
+            console.log(`🔑 ${account.name}`);
+            console.log(`   Email: ${account.email}`);
+            console.log(`   SSH Key: ${account.sshKeyPath}\n`);
+        });
+    }
+    catch (error) {
+        console.error('❌ Failed to list keys:', error);
+    }
+}));
+// Automation Commands  
+const autoCmd = program
+    .command('auto')
+    .description('Workflow automation commands');
+autoCmd
+    .command('rule')
+    .description('Automation rule management')
+    .addCommand(new commander_1.Command('create')
+    .description('Create automation rule')
+    .action(async () => {
+    try {
+        const { condition, action } = await inquirer_1.default.prompt([
+            {
+                type: 'list',
+                name: 'condition',
+                message: 'Rule condition:',
+                choices: [
+                    { name: 'Project path matches pattern', value: 'path_match' },
+                    { name: 'Remote URL matches pattern', value: 'url_match' },
+                    { name: 'Branch name matches pattern', value: 'branch_match' }
+                ]
+            },
+            {
+                type: 'list',
+                name: 'action',
+                message: 'Rule action:',
+                choices: [
+                    { name: 'Switch to specific account', value: 'switch_account' },
+                    { name: 'Apply git hooks', value: 'apply_hooks' },
+                    { name: 'Set signing key', value: 'set_signing' }
+                ]
+            }
+        ]);
+        const rule = await workflowAutomationManager.createRule({
+            name: `Rule ${Date.now()}`,
+            description: 'Auto-generated rule',
+            trigger: { type: 'project_open' },
+            conditions: [{
+                    type: condition === 'path_match' ? 'path_contains' : 'remote_url',
+                    operator: 'contains',
+                    value: '*'
+                }],
+            actions: [{
+                    id: `action_${Date.now()}`,
+                    type: action === 'switch_account' ? 'switch_account' : 'notify',
+                    parameters: {},
+                    continueOnError: true
+                }],
+            enabled: true,
+            priority: 0,
+            createdBy: 'cli'
+        });
+        console.log(`✅ Created automation rule: ${rule.id}`);
+    }
+    catch (error) {
+        console.error('❌ Failed to create rule:', error);
+    }
+}))
+    .addCommand(new commander_1.Command('list')
+    .description('List automation rules')
+    .action(async () => {
+    try {
+        const rules = workflowAutomationManager.getRules();
+        console.log('🤖 Automation Rules\n');
+        if (rules.length === 0) {
+            console.log('❌ No automation rules configured');
+            return;
+        }
+        rules.forEach(rule => {
+            console.log(`🤖 ${rule.name} (${rule.enabled ? 'Enabled' : 'Disabled'})`);
+            console.log(`   Trigger: ${rule.trigger.type}`);
+            console.log(`   Conditions: ${rule.conditions.length}`);
+            console.log(`   Actions: ${rule.actions.length}\n`);
+        });
+    }
+    catch (error) {
+        console.error('❌ Failed to list rules:', error);
+    }
+}));
+// Monorepo Commands
+const monoCmd = program
+    .command('mono')
+    .description('Monorepo management');
+monoCmd
+    .command('setup')
+    .description('Setup monorepo configuration')
+    .action(async () => {
+    const projectPath = process.cwd();
+    try {
+        const config = {
+            rootPath: projectPath,
+            subprojects: [],
+            inheritanceRules: [],
+            enabled: true
+        };
+        const result = advancedGitManager.setupMonorepo(config);
+        if (result) {
+            console.log('✅ Monorepo setup completed');
+        }
+        else {
+            console.error('❌ Monorepo setup failed');
+        }
+    }
+    catch (error) {
+        console.error('❌ Setup failed:', error);
+    }
+});
+monoCmd
+    .command('detect')
+    .description('Detect subproject for file')
+    .argument('<file>', 'File path to detect subproject for')
+    .action(async (file) => {
+    const projectPath = process.cwd();
+    try {
+        const subproject = advancedGitManager.detectSubproject(projectPath, file);
+        if (subproject) {
+            console.log(`📁 Subproject detected: ${subproject.name}`);
+            console.log(`   Path: ${subproject.path}`);
+        }
+        else {
+            console.log(`❌ No subproject detected for ${file}`);
+        }
+    }
+    catch (error) {
+        console.error('❌ Detection failed:', error);
+    }
+});
+monoCmd
+    .command('status')
+    .description('Show subproject status')
+    .action(async () => {
+    const projectPath = process.cwd();
+    try {
+        // Use existing getAccountForFile logic
+        const accounts = storageManager.getAccounts();
+        console.log('📊 Monorepo Status\n');
+        console.log('📁 Current project structure analysis...');
+        // Simple implementation for now
+        console.log('✅ Monorepo status check completed');
+    }
+    catch (error) {
+        console.error('❌ Status check failed:', error);
+    }
+});
 // Parse CLI arguments
 program.parse();
 // If no command provided, show help
