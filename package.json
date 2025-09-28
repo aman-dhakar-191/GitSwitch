@@ -17,7 +17,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build:types && npm run build:core && npm run build:cli",
+    "build": "npm run gulp build",
     "build:types": "cd packages/types && npm run build",
     "build:core": "cd packages/core && npm run build",
     "build:cli": "cd packages/cli && npm run build",
@@ -26,11 +26,11 @@
     "package": "npm run build:global",
     "test": "npm run test --workspaces",
     "dev": "npm run dev --workspaces",
-    "clean": "npm run clean --workspaces",
+    "clean": "gulp clean",
     "lint": "npm run lint --workspaces",
     "test-cli": "node test-cli.js",
     "gitswitch": "node gitswitch.js",
-    "setup": "node setup.js",
+    "setup": "gulp setup",
     "demo": "node demo.js",
     "install-global": "cd packages/gitswitch && npm install -g .",
     "uninstall-global": "npm uninstall -g gitswitch",
