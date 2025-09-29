@@ -1,1 +1,13 @@
 export * from './cli';
+export { BaseCommand } from './commands/base/BaseCommand';
+export { DotCommand } from './commands/DotCommand';
+export { AccountCommands } from './commands/AccountCommands';
+export { ProjectCommands } from './commands/ProjectCommands';
+export { HookCommands } from './commands/HookCommands';
+export { CommandRegistry } from './commands/CommandRegistry';
+export { CLIUtils } from './utils/CLIUtils';
+export { AuthUtils } from './utils/AuthUtils';
+export * from './types/CommandTypes';
+export { BlessedUI, BlessedStatusUI } from './ui/blessed-ui';
+export { BaseUIComponent, UIThemes, UILayouts, UIContentGenerators } from './ui';
+export { ModularBlessedUI, ModularBlessedStatusUI } from './ui/ModularBlessedUI';
