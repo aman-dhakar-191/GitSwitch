@@ -6,7 +6,7 @@
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 [![GitHub issues](https://img.shields.io/github/issues/aman-dhakar-191/GitSwitch)](https://github.com/aman-dhakar-191/GitSwitch/issues)
-[![GitHub stars](https://img.shields.io/github/stars/aman-dhakar-191/GitSwitch)](https://github.com/aman-dhakar-191/GitSwitch/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/aman-dhakar-191/GitSwitch?style=flat&logo=github)](https://github.com/aman-dhakar-191/GitSwitch/stargazers)
 
 A lightweight git identity management tool that eliminates context switching friction for developers working with multiple accounts.
 
