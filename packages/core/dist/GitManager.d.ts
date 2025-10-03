@@ -49,4 +49,16 @@ export declare class GitManager {
      * Generate user-friendly error messages for common git command failures
      */
     private getGitErrorMessage;
+    /**
+     * Clone a repository
+     */
+    cloneRepository(url: string, directory?: string): Promise<string>;
+    /**
+     * Initialize a new repository
+     */
+    initRepository(directory: string, bare?: boolean): Promise<void>;
+    /**
+     * Get repository status
+     */
+    getStatus(repoPath: string): Promise<any>;
 }

@@ -120,6 +120,14 @@ export class StorageManager {
   }
 
   /**
+   * Get account by email
+   */
+  getAccountByEmail(email: string): GitAccount | null {
+    const accounts = this.getAccounts();
+    return accounts.find(account => account.email === email) || null;
+  }
+
+  /**
    * Get all stored projects
    */
   getProjects(): Project[] {

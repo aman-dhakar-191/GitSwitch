@@ -498,6 +498,145 @@ export class AdvancedGitManager {
   private generateId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
   }
+
+  /**
+   * Perform git reset with identity preservation
+   */
+  async performGitReset(projectPath: string, commit: string, mode: 'soft' | 'mixed' | 'hard'): Promise<any> {
+    try {
+      const modeFlag = mode === 'soft' ? '--soft' : mode === 'hard' ? '--hard' : '--mixed';
+      const result = this.executeGitCommand(`reset ${modeFlag} ${commit}`, projectPath);
+      
+      return {
+        success: true,
+        result,
+        filesChanged: this.getChangedFilesCount(projectPath)
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Perform git revert with identity preservation
+   */
+  async performGitRevert(projectPath: string, commit: string, createCommit: boolean): Promise<any> {
+    try {
+      const noCommitFlag = createCommit ? '' : '--no-commit';
+      const result = this.executeGitCommand(`revert ${noCommitFlag} ${commit}`, projectPath);
+      
+      const conflicts = this.checkForConflicts(projectPath);
+      
+      return {
+        success: true,
+        result,
+        conflicts: conflicts.length > 0 ? conflicts : undefined
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        conflicts: this.checkForConflicts(projectPath)
+      };
+    }
+  }
+
+  /**
+   * Perform git cherry-pick with identity preservation
+   */
+  async performGitCherryPick(projectPath: string, commit: string, createCommit: boolean): Promise<any> {
+    try {
+      const noCommitFlag = createCommit ? '' : '--no-commit';
+      const result = this.executeGitCommand(`cherry-pick ${noCommitFlag} ${commit}`, projectPath);
+      
+      const conflicts = this.checkForConflicts(projectPath);
+      
+      return {
+        success: true,
+        result,
+        conflicts: conflicts.length > 0 ? conflicts : undefined
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        conflicts: this.checkForConflicts(projectPath)
+      };
+    }
+  }
+
+  /**
+   * Perform git squash (interactive rebase)
+   */
+  async performGitSquash(projectPath: string, count: number, message: string): Promise<any> {
+    try {
+      // Use non-interactive rebase with squash
+      const result = this.executeGitCommand(`reset --soft HEAD~${count}`, projectPath);
+      const commitResult = this.executeGitCommand(`commit -m "${message.replace(/"/g, '\\"')}"`, projectPath);
+      
+      const newHash = this.executeGitCommand('rev-parse HEAD', projectPath).trim();
+      
+      return {
+        success: true,
+        result: commitResult,
+        newCommitHash: newHash
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Preserve identity after git operation
+   */
+  async preserveIdentity(projectPath: string, config: GitConfig): Promise<void> {
+    await this.gitManager.setConfig(projectPath, config);
+  }
+
+  /**
+   * Abort a git operation (cherry-pick, rebase, etc.)
+   */
+  async abortGitOperation(projectPath: string, operation: string): Promise<void> {
+    this.executeGitCommand(`${operation} --abort`, projectPath);
+  }
+
+  /**
+   * Continue a git operation after resolving conflicts
+   */
+  async continueGitOperation(projectPath: string, operation: string): Promise<void> {
+    this.executeGitCommand(`${operation} --continue`, projectPath);
+  }
+
+  /**
+   * Check for merge conflicts
+   */
+  private checkForConflicts(projectPath: string): string[] {
+    try {
+      const result = this.executeGitCommand('diff --name-only --diff-filter=U', projectPath);
+      return result.trim().split('\n').filter(f => f.length > 0);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  /**
+   * Get count of changed files
+   */
+  private getChangedFilesCount(projectPath: string): number {
+    try {
+      const result = this.executeGitCommand('diff --name-only', projectPath);
+      const files = result.trim().split('\n').filter(f => f.length > 0);
+      return files.length;
+    } catch (error) {
+      return 0;
+    }
+  }
 }
 
 export default AdvancedGitManager;

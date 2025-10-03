@@ -133,6 +133,13 @@ class StorageManager {
         return this.saveAccounts(filtered);
     }
     /**
+     * Get account by email
+     */
+    getAccountByEmail(email) {
+        const accounts = this.getAccounts();
+        return accounts.find(account => account.email === email) || null;
+    }
+    /**
      * Get all stored projects
      */
     getProjects() {

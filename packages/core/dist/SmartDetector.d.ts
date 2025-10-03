@@ -54,5 +54,35 @@ export declare class SmartDetector {
     private savePatterns;
     private getDefaultAnalytics;
     private generateId;
+    /**
+     * Suggest account for a URL
+     */
+    suggestAccountForUrl(url: string): Promise<any[]>;
+    /**
+     * Suggest account for a path
+     */
+    suggestAccountForPath(targetPath: string): Promise<any[]>;
+    /**
+     * Record account usage for learning
+     */
+    recordAccountUsage(accountEmail: string, urlOrPath: string): Promise<void>;
+    /**
+     * Learn patterns from usage
+     */
+    learnPatternsFromUsage(): Promise<any[]>;
+    /**
+     * Get learned patterns
+     */
+    getLearnedPatterns(): Promise<any[]>;
+    /**
+     * Import patterns
+     */
+    importPatterns(patterns: any[], merge: boolean): Promise<any>;
+    private calculateUrlConfidence;
+    private calculatePathConfidence;
+    private generateUrlReason;
+    private generatePathReason;
+    private getUrlUsageHistory;
+    private extractUrlPatterns;
 }
 export default SmartDetector;
