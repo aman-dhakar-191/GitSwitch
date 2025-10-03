@@ -186,6 +186,25 @@ export class CLIUtils {
   }
 
   /**
+   * Display an error message
+   */
+  static showError(context: string, error: any): void {
+    console.error(`\n❌ ${context}`);
+    console.error(`   Error: ${error.message || error}`);
+    if (error.stack && process.env.DEBUG) {
+      console.error(`\n   Stack trace:`);
+      console.error(error.stack);
+    }
+  }
+
+  /**
+   * Display a success message
+   */
+  static showSuccess(message: string): void {
+    console.log(`\n✅ ${message}`);
+  }
+
+  /**
    * Confirm action with user
    */
   static async confirmAction(message: string, defaultValue: boolean = false): Promise<boolean> {

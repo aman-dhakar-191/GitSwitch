@@ -32,6 +32,10 @@ export declare class StorageManager {
      */
     deleteAccount(id: string): boolean;
     /**
+     * Get account by email
+     */
+    getAccountByEmail(email: string): GitAccount | null;
+    /**
      * Get all stored projects
      */
     getProjects(): Project[];

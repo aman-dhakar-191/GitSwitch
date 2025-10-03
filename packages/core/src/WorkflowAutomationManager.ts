@@ -661,6 +661,28 @@ export class WorkflowAutomationManager {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
   }
 
+  /**
+   * Find rules matching a project path and trigger type
+   */
+  async findMatchingRules(projectPath: string, triggerType: string): Promise<AutomationRule[]> {
+    const matchingRules: AutomationRule[] = [];
+
+    for (const rule of this.automationRules) {
+      if (!rule.enabled) continue;
+      if (rule.trigger.type !== triggerType) continue;
+
+      // Check if conditions match
+      const conditionsMet = await this.evaluateConditions(rule.conditions, { projectPath });
+      
+      if (conditionsMet) {
+        matchingRules.push(rule);
+      }
+    }
+
+    // Sort by priority (higher first)
+    return matchingRules.sort((a, b) => b.priority - a.priority);
+  }
+
   // Cleanup on shutdown
   destroy(): void {
     this.stopAutomationEngine();

@@ -348,5 +348,87 @@ class GitManager {
         // Generic fallback with more context
         return `Git operation failed: ${command}\nLocation: ${cwd}\nError: ${errorOutput.split('\n')[0] || error.message}\nSuggestion: Check if the directory is a valid git repository and you have proper permissions.`;
     }
+    /**
+     * Clone a repository
+     */
+    async cloneRepository(url, directory) {
+        try {
+            const targetDir = directory || path.basename(url, '.git');
+            const targetPath = path.resolve(targetDir);
+            this.executeGitCommand(`clone ${url} ${targetDir}`, process.cwd());
+            return targetPath;
+        }
+        catch (error) {
+            throw new Error(`Failed to clone repository: ${error.message}`);
+        }
+    }
+    /**
+     * Initialize a new repository
+     */
+    async initRepository(directory, bare = false) {
+        try {
+            const bareFlag = bare ? '--bare' : '';
+            this.executeGitCommand(`init ${bareFlag}`, directory);
+        }
+        catch (error) {
+            throw new Error(`Failed to initialize repository: ${error.message}`);
+        }
+    }
+    /**
+     * Get repository status
+     */
+    async getStatus(repoPath) {
+        try {
+            if (!this.isGitRepository(repoPath)) {
+                throw new Error('Not a git repository');
+            }
+            // Get current branch
+            let branch = '';
+            try {
+                branch = this.executeGitCommand('rev-parse --abbrev-ref HEAD', repoPath).trim();
+            }
+            catch (e) {
+                branch = 'detached HEAD';
+            }
+            // Get status info
+            const statusOutput = this.executeGitCommand('status --porcelain=v1 --branch', repoPath);
+            // Parse status
+            const lines = statusOutput.split('\n').filter(l => l.length > 0);
+            const files = [];
+            let ahead = 0;
+            let behind = 0;
+            lines.forEach(line => {
+                if (line.startsWith('##')) {
+                    // Branch info line
+                    const match = line.match(/ahead (\d+)/);
+                    if (match)
+                        ahead = parseInt(match[1]);
+                    const behindMatch = line.match(/behind (\d+)/);
+                    if (behindMatch)
+                        behind = parseInt(behindMatch[1]);
+                }
+                else {
+                    // File status line
+                    const status = line.substring(0, 2);
+                    const filePath = line.substring(3);
+                    files.push({
+                        path: filePath,
+                        status: status.trim(),
+                        staged: status[0] !== ' ' && status[0] !== '?',
+                        untracked: status[0] === '?' && status[1] === '?'
+                    });
+                }
+            });
+            return {
+                branch,
+                ahead,
+                behind,
+                files
+            };
+        }
+        catch (error) {
+            throw new Error(`Failed to get repository status: ${error.message}`);
+        }
+    }
 }
 exports.GitManager = GitManager;
