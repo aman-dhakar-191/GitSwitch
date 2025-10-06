@@ -12,7 +12,10 @@ import { AdvancedGitManager } from './AdvancedGitManager';
 import { WorkflowAutomationManager } from './WorkflowAutomationManager';
 import { BulkImportManager } from './BulkImportManager';
 import { OAuthManager } from './OAuthManager';
-export { GitManager, StorageManager, ProjectManager, SmartDetector, ProjectScanner, GitHookManager, TeamManager, SecurityManager, ConfigSyncManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager, OAuthManager };
+import { WorkflowTemplateManager } from './WorkflowTemplateManager';
+import { AutomationTemplateManager } from './AutomationTemplateManager';
+import { HistoryRewriteManager } from './HistoryRewriteManager';
+export { GitManager, StorageManager, ProjectManager, SmartDetector, ProjectScanner, GitHookManager, TeamManager, SecurityManager, ConfigSyncManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager, OAuthManager, WorkflowTemplateManager, AutomationTemplateManager, HistoryRewriteManager };
 declare const _default: {
     GitManager: typeof GitManager;
     StorageManager: typeof StorageManager;
@@ -28,5 +31,8 @@ declare const _default: {
     WorkflowAutomationManager: typeof WorkflowAutomationManager;
     BulkImportManager: typeof BulkImportManager;
     OAuthManager: typeof OAuthManager;
+    WorkflowTemplateManager: typeof WorkflowTemplateManager;
+    AutomationTemplateManager: typeof AutomationTemplateManager;
+    HistoryRewriteManager: typeof HistoryRewriteManager;
 };
 export default _default;

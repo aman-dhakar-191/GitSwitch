@@ -5,7 +5,7 @@ import inquirer from 'inquirer';
 import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
-import { ProjectManager, ProjectScanner, SmartDetector, StorageManager, GitManager, GitHookManager, TeamManager, SecurityManager, ConfigSyncManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager, OAuthManager } from '@gitswitch/core';
+import { ProjectManager, ProjectScanner, SmartDetector, StorageManager, GitManager, GitHookManager, TeamManager, SecurityManager, ConfigSyncManager, PluginManager, AdvancedGitManager, WorkflowAutomationManager, BulkImportManager, OAuthManager, WorkflowTemplateManager, AutomationTemplateManager, HistoryRewriteManager } from '@gitswitch/core';
 import { GitHookInstallConfig } from '@gitswitch/types';
 import { BlessedUI, BlessedStatusUI } from './ui/blessed-ui';
 
@@ -24,6 +24,9 @@ const advancedGitManager = new AdvancedGitManager(gitManager, securityManager, s
 const workflowAutomationManager = new WorkflowAutomationManager(storageManager, gitManager, projectManager, securityManager, advancedGitManager);
 const bulkImportManager = new BulkImportManager(storageManager, projectScanner, smartDetector, gitManager);
 const oauthManager = new OAuthManager(storageManager);
+const workflowTemplateManager = new WorkflowTemplateManager(storageManager, gitManager);
+const automationTemplateManager = new AutomationTemplateManager(storageManager, workflowAutomationManager);
+const historyRewriteManager = new HistoryRewriteManager(storageManager, gitManager);
 
 program
   .name('gitswitch')
@@ -55,7 +58,7 @@ program
       });
       ui.render();
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to analyze project:', error);
       process.exit(1);
     }
@@ -106,7 +109,7 @@ projectCmd
         }
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to get status:', error);
       process.exit(1);
     }
@@ -194,7 +197,7 @@ projectCmd
 
       displayProjects(filteredProjects);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to list projects:', error);
       process.exit(1);
     }
@@ -368,7 +371,7 @@ accountCmd
           break;
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to manage accounts:', error);
       process.exit(1);
     }
@@ -678,7 +681,7 @@ hookCmd
         }
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Validation error:', error);
       process.exit(1);
     }
@@ -847,7 +850,7 @@ async function changeIdentity(projectPath: string) {
     } else {
       console.error('❌ Failed to set git config');
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error setting git config:', error);
   }
 }
@@ -955,7 +958,7 @@ async function scanProjects() {
       console.log(`✅ Import completed. ${result.projects.length} project(s) processed.`);
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Failed to scan directory:', error);
     process.exit(1);
   }
@@ -1248,7 +1251,7 @@ function displayProjects(projects: any[]) {
       try {
         const lastAccessedDate = project.lastAccessed instanceof Date ? project.lastAccessed : new Date(project.lastAccessed);
         lastAccessedText = lastAccessedDate.toLocaleDateString();
-      } catch (error) {
+      } catch (error: any) {
         lastAccessedText = 'Invalid date';
       }
     }
@@ -1274,7 +1277,7 @@ function displayAccounts(accounts: any[]) {
       try {
         const lastUsedDate = account.lastUsed instanceof Date ? account.lastUsed : new Date(account.lastUsed);
         lastUsedText = lastUsedDate.toLocaleDateString();
-      } catch (error) {
+      } catch (error: any) {
         lastUsedText = 'Invalid date';
       }
     }
@@ -1314,7 +1317,7 @@ projectCmd
           console.log(`   Reason: ${suggestion.reason}\n`);
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error getting suggestions:', error);
     }
   });
@@ -1337,7 +1340,7 @@ projectCmd
         // Interactive mode
         await changeIdentity(projectPath);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error switching identity:', error);
     }
   });
@@ -1371,7 +1374,7 @@ projectCmd
       } else {
         console.log(`❌ No git config found`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Health check failed:', error);
     }
   });
@@ -1417,7 +1420,7 @@ projectCmd
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Analysis failed:', error);
     }
   });
@@ -1452,7 +1455,7 @@ repoCmd
       // Add git status info
       console.log('\n📋 Git Status:');
       console.log('   (Run `git status` for detailed information)');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Status check failed:', error);
     }
   });
@@ -1477,7 +1480,7 @@ repoCmd
       
       console.log(`🔍 Found ${filtered.length} repositories:\n`);
       displayProjects(filtered);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Search failed:', error);
     }
   });
@@ -1499,7 +1502,7 @@ repoCmd
           console.log(`💡 Suggested account: ${result.suggestedAccount}`);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Validation failed:', error);
     }
   });
@@ -1523,7 +1526,7 @@ remoteCmd
       } else {
         console.error(`❌ Failed to push to ${remote}: ${result.error}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Push failed:', error);
     }
   });
@@ -1542,7 +1545,7 @@ remoteCmd
       } else {
         console.error(`❌ Failed to pull from ${remote}: ${result.error}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Pull failed:', error);
     }
   });
@@ -1565,7 +1568,7 @@ remoteCmd
       remotes.forEach(remote => {
         console.log(`🔗 ${remote.name}: ${remote.url}`);
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to get remote status:', error);
     }
   });
@@ -1584,7 +1587,7 @@ remoteCmd
       } else {
         console.error(`❌ Failed to configure ${remote}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Configuration failed:', error);
     }
   });
@@ -1604,7 +1607,7 @@ remoteCmd
           console.log(`✅ Connection to ${remote} successful`);
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Test failed:', error);
     }
   });
@@ -1637,7 +1640,7 @@ branchCmd
             console.log(`   Required Account: ${policy.requiredAccount.name} (${policy.requiredAccount.email})`);
             console.log(`   Enforcement: ${policy.enforcement}\n`);
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error('❌ Failed to get policies:', error);
         }
       })
@@ -1673,7 +1676,7 @@ branchCmd
           } else {
             console.error(`❌ Failed to add policy`);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('❌ Policy creation failed:', error);
         }
       })
@@ -1717,11 +1720,11 @@ branchCmd
           } else {
             console.log(`❌ Branch validation failed`);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('❌ Validation error:', error);
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Validation failed:', error);
     }
   });
@@ -1745,7 +1748,7 @@ accountCmd
           const lastUsed = account.lastUsed ? new Date(account.lastUsed).toLocaleDateString() : 'Never';
           console.log(`   Last used: ${lastUsed}\n`);
         });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to get usage stats:', error);
     }
   });
@@ -1774,7 +1777,7 @@ accountCmd
           console.log(`✅ ${account.name} authentication valid`);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Authentication test failed:', error);
     }
   });
@@ -1799,11 +1802,11 @@ accountCmd
         try {
           // Simple refresh - just log for now since we need proper OAuthAccount type
           console.log(`🔄 Token refresh not yet implemented for ${account.name}`);
-        } catch (error) {
+        } catch (error: any) {
           console.log(`❌ Error refreshing ${account.name}:`, error);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Token refresh failed:', error);
     }
   });
@@ -1861,7 +1864,7 @@ securityCmd
       });
       
       console.log('✅ Security audit completed');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Security audit failed:', error);
     }
   });
@@ -1889,7 +1892,7 @@ securityCmd
             console.log(`   Email: ${account.email}`);
             console.log(`   SSH Key: ${account.sshKeyPath}\n`);
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error('❌ Failed to list keys:', error);
         }
       })
@@ -1952,7 +1955,7 @@ autoCmd
           });
           
           console.log(`✅ Created automation rule: ${rule.id}`);
-        } catch (error) {
+        } catch (error: any) {
           console.error('❌ Failed to create rule:', error);
         }
       })
@@ -1977,7 +1980,7 @@ autoCmd
             console.log(`   Conditions: ${rule.conditions.length}`);
             console.log(`   Actions: ${rule.actions.length}\n`);
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error('❌ Failed to list rules:', error);
         }
       })
@@ -2007,7 +2010,7 @@ monoCmd
       } else {
         console.error('❌ Monorepo setup failed');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Setup failed:', error);
     }
   });
@@ -2027,7 +2030,7 @@ monoCmd
       } else {
         console.log(`❌ No subproject detected for ${file}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Detection failed:', error);
     }
   });
@@ -2046,7 +2049,7 @@ monoCmd
       
       // Simple implementation for now
       console.log('✅ Monorepo status check completed');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Status check failed:', error);
     }
   });
@@ -2088,7 +2091,7 @@ projectCmd
       } else {
         console.log('⚠️  Confidence too low for auto-setup, manual configuration recommended');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Auto-setup failed:', error);
     }
   });
@@ -2114,7 +2117,7 @@ projectCmd
       
       console.log(`🔍 Found ${similarProjects.length} similar projects:\n`);
       displayProjects(similarProjects.slice(0, 10)); // Show top 10
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to find similar projects:', error);
     }
   });
@@ -2144,7 +2147,7 @@ projectCmd
           console.log(`   Reason: ${suggestion.reason}\n`);
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Prediction failed:', error);
     }
   });
@@ -2169,7 +2172,7 @@ projectCmd
       fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2));
       
       console.log(`✅ Project configuration backed up to ${backupPath}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Backup failed:', error);
     }
   });
@@ -2201,7 +2204,7 @@ projectCmd
       console.log(`   Pattern: ${template.pattern}`);
       console.log(`   Account: ${gitConfig.name} <${gitConfig.email}>`);
       console.log('\n💡 Template can be used for similar projects in the future');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Template creation failed:', error);
     }
   });
@@ -2250,7 +2253,7 @@ commitCmd
         console.log('✅ Identity validation passed. Ready to commit.');
         console.log('💡 Use `git commit` to create your commit');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Commit preparation failed:', error);
     }
   });
@@ -2284,7 +2287,7 @@ commitCmd
       if (options.message) {
         console.log(`   Message: "${options.message}"`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Signed commit preparation failed:', error);
     }
   });
@@ -2385,7 +2388,7 @@ branchCmd
           }
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Branch creation failed:', error);
     }
   });
@@ -2421,7 +2424,7 @@ branchCmd
           }
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Branch switch failed:', error);
     }
   });
@@ -2565,7 +2568,7 @@ workflowCmd
       } else {
         console.log('💡 Run: git commit to complete the workflow');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Smart commit workflow failed:', error);
     }
   });
@@ -2590,7 +2593,7 @@ workflowCmd
       } else {
         console.error('❌ Pre-push validation failed:', result.message);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Smart push workflow failed:', error);
     }
   });
@@ -2608,7 +2611,7 @@ workflowCmd
       console.log('✅ Pre-pull checks passed');
       console.log(`📥 Ready to pull from ${remote}/${branch}`);
       console.log(`💡 Run: git pull ${remote} ${branch}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Smart pull workflow failed:', error);
     }
   });
@@ -2636,7 +2639,7 @@ workflowCmd
       console.log(`📁 Target directory: ${targetDir}`);
       console.log(`💡 Run: git clone ${url} ${targetDir}`);
       console.log('💡 Then run: gitswitch project auto-setup');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Smart clone preparation failed:', error);
     }
   });
@@ -2663,13 +2666,13 @@ workflowCmd
           if (result.match && result.reason) {
             console.log(`     Reason: ${result.reason}`);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.log(`   ${rule.name}: ❌ Error`);
         }
       }
       
       console.log('\n✅ Synchronization complete');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Sync failed:', error);
     }
   });
@@ -2705,7 +2708,7 @@ configCmd
       fs.writeFileSync(options.file, JSON.stringify(config, null, 2));
       console.log(`✅ Configuration exported to ${options.file}`);
       console.log(`📊 Exported: ${accounts.length} accounts, ${projects.length} projects, ${rules.length} rules`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Export failed:', error);
     }
   });
@@ -2747,7 +2750,7 @@ configCmd
       
       console.log('✅ Configuration import completed');
       console.log('💡 Note: OAuth tokens need to be re-authenticated');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Import failed:', error);
     }
   });
@@ -2773,7 +2776,7 @@ configCmd
       fs.writeFileSync(backupFile, JSON.stringify(backup, null, 2));
       console.log(`✅ Backup created: ${backupFile}`);
       console.log(`📊 Backed up: ${accounts.length} accounts, ${projects.length} projects`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Backup failed:', error);
     }
   });
@@ -2809,7 +2812,7 @@ configCmd
       const backupData = JSON.parse(fs.readFileSync(backupFile, 'utf8'));
       console.log(`📊 Restoring: ${backupData.accounts?.length || 0} accounts, ${backupData.projects?.length || 0} projects`);
       console.log('✅ Configuration restored from backup');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Restore failed:', error);
     }
   });
@@ -3076,11 +3079,196 @@ gitCmd
     new Command('fix')
       .description('Interactive history rewriting with identity fixes')
       .option('--interactive', 'Interactive mode')
+      .option('--range <range>', 'Commit range', 'HEAD~10..HEAD')
+      .option('--dry-run', 'Preview changes without applying')
+      .option('--no-backup', 'Skip creating backup')
+      .action(async (options) => {
+        try {
+          const projectPath = process.cwd();
+
+          if (!gitManager.isGitRepository(projectPath)) {
+            console.error('❌ Not a git repository');
+            process.exit(1);
+          }
+
+          console.log('🔍 Analyzing git history...');
+          const commits = historyRewriteManager.analyzeHistory(projectPath, options.range);
+
+          const commitsToFix = commits.filter(c => c.needsFixing);
+
+          if (commitsToFix.length === 0) {
+            console.log('✅ No commits need fixing!');
+            return;
+          }
+
+          console.log(`\n📊 Found ${commitsToFix.length} commit(s) that need fixing:\n`);
+          commitsToFix.forEach(commit => {
+            console.log(`  ${commit.shortHash}: ${commit.author} <${commit.authorEmail}>`);
+            if (commit.suggestedAccount) {
+              console.log(`    → Suggested: ${commit.suggestedAccount.gitName} <${commit.suggestedAccount.email}>`);
+            } else {
+              console.log(`    → No matching account found`);
+            }
+          });
+
+          if (options.interactive) {
+            const { proceed } = await inquirer.prompt([
+              {
+                type: 'confirm',
+                name: 'proceed',
+                message: `Rewrite ${commitsToFix.length} commit(s)?`,
+                default: false
+              }
+            ]);
+
+            if (!proceed) {
+              console.log('Cancelled.');
+              return;
+            }
+          }
+
+          console.log('\n🔧 Rewriting git history...');
+          const result = await historyRewriteManager.fixHistoryInteractive(projectPath, {
+            range: options.range,
+            dryRun: options.dryRun,
+            preserveDates: true,
+            createBackup: options.backup !== false
+          });
+
+          if (result.success) {
+            console.log(`\n✅ History rewriting completed!`);
+            console.log(`   Commits rewritten: ${result.commitsRewritten}`);
+            if (result.backupRef) {
+              console.log(`   Backup: ${result.backupRef}`);
+              console.log(`   To restore: git reset --hard ${result.backupRef}`);
+            }
+          } else {
+            console.error('\n❌ History rewriting failed');
+            if (result.errors.length > 0) {
+              console.error('\nErrors:');
+              result.errors.forEach(err => console.error(`  - ${err}`));
+            }
+            process.exit(1);
+          }
+
+          if (result.warnings.length > 0) {
+            console.log('\n⚠️  Warnings:');
+            result.warnings.forEach(warn => console.log(`  - ${warn}`));
+          }
+        } catch (error: any) {
+          console.error('❌ Error:', error.message);
+          process.exit(1);
+        }
+      })
+  )
+  .addCommand(
+    new Command('analyze')
+      .description('Analyze git history for identity issues')
+      .option('--range <range>', 'Commit range', 'HEAD~10..HEAD')
+      .action(async (options) => {
+        try {
+          const projectPath = process.cwd();
+
+          if (!gitManager.isGitRepository(projectPath)) {
+            console.error('❌ Not a git repository');
+            process.exit(1);
+          }
+
+          const commits = historyRewriteManager.analyzeHistory(projectPath, options.range);
+          const commitsToFix = commits.filter(c => c.needsFixing);
+
+          console.log(`\n📊 History Analysis:`);
+          console.log(`   Total commits: ${commits.length}`);
+          console.log(`   Commits needing fixes: ${commitsToFix.length}`);
+          console.log(`   Clean commits: ${commits.length - commitsToFix.length}`);
+
+          if (commitsToFix.length > 0) {
+            console.log(`\n🔧 Commits needing fixes:\n`);
+            commitsToFix.forEach(commit => {
+              console.log(`  ${commit.shortHash}: ${commit.message.substring(0, 50)}...`);
+              console.log(`    Current: ${commit.author} <${commit.authorEmail}>`);
+              if (commit.suggestedAccount) {
+                console.log(`    Suggested: ${commit.suggestedAccount.gitName} <${commit.suggestedAccount.email}>`);
+              } else {
+                console.log(`    ⚠️  No matching account found`);
+              }
+              console.log('');
+            });
+          }
+        } catch (error: any) {
+          console.error('❌ Error:', error.message);
+          process.exit(1);
+        }
+      })
+  )
+  .addCommand(
+    new Command('verify-signatures')
+      .description('Verify commit signatures')
+      .option('--range <range>', 'Commit range', 'HEAD~10..HEAD')
+      .action(async (options) => {
+        try {
+          const projectPath = process.cwd();
+
+          if (!gitManager.isGitRepository(projectPath)) {
+            console.error('❌ Not a git repository');
+            process.exit(1);
+          }
+
+          const results = historyRewriteManager.verifyCommitSignatures(projectPath, options.range);
+
+          console.log(`\n🔍 Signature Verification Results:\n`);
+          results.forEach(result => {
+            const icon = result.valid ? '✅' : result.signed ? '⚠️' : '❌';
+            const status = result.valid ? 'Valid' : result.signed ? 'Invalid' : 'Not signed';
+            
+            console.log(`  ${icon} ${result.hash.substring(0, 8)}: ${status}`);
+            if (result.signer) {
+              console.log(`     Signer: ${result.signer}`);
+            }
+          });
+
+          const signed = results.filter(r => r.signed).length;
+          const valid = results.filter(r => r.valid).length;
+
+          console.log(`\n📊 Summary:`);
+          console.log(`   Total commits: ${results.length}`);
+          console.log(`   Signed: ${signed}`);
+          console.log(`   Valid signatures: ${valid}`);
+          console.log(`   Unsigned: ${results.length - signed}`);
+        } catch (error: any) {
+          console.error('❌ Error:', error.message);
+          process.exit(1);
+        }
+      })
+  )
+  .addCommand(
+    new Command('backups')
+      .description('List available history backups')
       .action(async () => {
-        console.log('🚧 COMING SOON: Interactive history rewriting');
-        console.log('📅 Expected: Q3 2024');
-        console.log('✨ Features: Safe history rewriting with identity corrections');
-        console.log('💡 For now, use `git filter-branch` or `git filter-repo`');
+        try {
+          const projectPath = process.cwd();
+
+          if (!gitManager.isGitRepository(projectPath)) {
+            console.error('❌ Not a git repository');
+            process.exit(1);
+          }
+
+          const backups = historyRewriteManager.listBackups(projectPath);
+
+          if (backups.length === 0) {
+            console.log('📝 No backups found.');
+            return;
+          }
+
+          console.log(`\n📦 Available Backups (${backups.length}):\n`);
+          backups.forEach(backup => {
+            console.log(`  ${backup}`);
+          });
+          console.log('\n💡 Restore with: git reset --hard <backup-ref>');
+        } catch (error: any) {
+          console.error('❌ Error:', error.message);
+          process.exit(1);
+        }
       })
   );
 
@@ -3454,71 +3642,352 @@ securityCmd
 // Workflow Templates (Phase 4)
 workflowCmd
   .command('template')
-  .description('Workflow templates [COMING SOON]')
+  .description('Workflow templates')
   .addCommand(
     new Command('create')
       .description('Create workflow template')
-      .action(async () => {
-        console.log('🚧 COMING SOON: Workflow Template System');
-        console.log('📅 Expected: Q4 2024');
-        console.log('✨ Features: Create and share workflow templates');
-        console.log('💡 For now, use `gitswitch project template`');
+      .option('--name <name>', 'Template name')
+      .option('--description <description>', 'Template description')
+      .option('--category <category>', 'Template category (commit|push|pull|clone|sync|custom)')
+      .action(async (options) => {
+        try {
+          const answers = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'name',
+              message: 'Template name:',
+              when: !options.name,
+              validate: (input) => input.trim().length > 0 || 'Name is required'
+            },
+            {
+              type: 'input',
+              name: 'description',
+              message: 'Template description:',
+              when: !options.description,
+              default: ''
+            },
+            {
+              type: 'list',
+              name: 'category',
+              message: 'Template category:',
+              when: !options.category,
+              choices: ['commit', 'push', 'pull', 'clone', 'sync', 'custom']
+            }
+          ]);
+
+          const name = options.name || answers.name;
+          const description = options.description || answers.description;
+          const category = options.category || answers.category;
+
+          const template = workflowTemplateManager.createTemplate({
+            name,
+            description,
+            category,
+            steps: [],
+            variables: {},
+            tags: [],
+            author: 'user'
+          });
+
+          console.log(`✅ Workflow template created: "${template.name}" (ID: ${template.id})`);
+          console.log('💡 Add steps to your template using the workflow template editor');
+        } catch (error: any) {
+          console.error('❌ Failed to create template:', error.message);
+          process.exit(1);
+        }
       })
   )
   .addCommand(
     new Command('apply')
       .description('Apply workflow template')
-      .action(async () => {
-        console.log('🚧 COMING SOON: Template Application');
-        console.log('📅 Expected: Q4 2024');
-        console.log('✨ Features: Apply pre-built workflow templates');
-        console.log('💡 For now, configure workflows manually');
+      .argument('[template-id]', 'Template ID')
+      .option('--project <path>', 'Project path', process.cwd())
+      .action(async (templateId, options) => {
+        try {
+          const templates = workflowTemplateManager.getTemplates();
+          
+          if (templates.length === 0) {
+            console.log('❌ No templates available. Create one with `gitswitch workflow template create`');
+            return;
+          }
+
+          let selectedTemplateId = templateId;
+
+          if (!selectedTemplateId) {
+            const { template } = await inquirer.prompt([
+              {
+                type: 'list',
+                name: 'template',
+                message: 'Select a template to apply:',
+                choices: templates.map(t => ({
+                  name: `${t.name} - ${t.description}`,
+                  value: t.id
+                }))
+              }
+            ]);
+            selectedTemplateId = template;
+          }
+
+          const success = await workflowTemplateManager.applyTemplate(
+            selectedTemplateId,
+            options.project
+          );
+
+          if (success) {
+            console.log('✅ Template applied successfully!');
+          } else {
+            console.error('❌ Failed to apply template');
+            process.exit(1);
+          }
+        } catch (error: any) {
+          console.error('❌ Error:', error.message);
+          process.exit(1);
+        }
+      })
+  )
+  .addCommand(
+    new Command('list')
+      .description('List workflow templates')
+      .option('--category <category>', 'Filter by category')
+      .action(async (options) => {
+        try {
+          const templates = workflowTemplateManager.getTemplates(options.category);
+
+          if (templates.length === 0) {
+            console.log('📝 No workflow templates found.');
+            console.log('💡 Create your first template with `gitswitch workflow template create`');
+            return;
+          }
+
+          console.log(`\n📋 Workflow Templates (${templates.length}):\n`);
+          templates.forEach(template => {
+            console.log(`  ${template.name}`);
+            console.log(`    ID: ${template.id}`);
+            console.log(`    Category: ${template.category}`);
+            console.log(`    Description: ${template.description}`);
+            console.log(`    Steps: ${template.steps.length}`);
+            console.log(`    Usage count: ${template.usageCount}`);
+            console.log('');
+          });
+        } catch (error: any) {
+          console.error('❌ Error:', error.message);
+          process.exit(1);
+        }
       })
   );
 
 workflowCmd
   .command('record')
-  .description('Record workflow actions [COMING SOON]')
-  .action(async () => {
-    console.log('🚧 COMING SOON: Workflow Recording');
-    console.log('📅 Expected: Q4 2024');
-    console.log('✨ Features: Record and replay complex workflow sequences');
-    console.log('💡 For now, use automation rules for simple workflows');
+  .description('Record workflow actions')
+  .option('--name <name>', 'Recording name')
+  .option('--stop', 'Stop current recording')
+  .action(async (options) => {
+    try {
+      if (options.stop) {
+        const recording = workflowTemplateManager.stopRecording();
+        if (recording) {
+          console.log(`⏹ Recording stopped: "${recording.name}"`);
+          console.log(`   Recorded ${recording.actions.length} actions`);
+          console.log('💡 Convert to template with `gitswitch workflow template convert`');
+        }
+        return;
+      }
+
+      const answers = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'name',
+          message: 'Recording name:',
+          when: !options.name,
+          validate: (input) => input.trim().length > 0 || 'Name is required'
+        },
+        {
+          type: 'input',
+          name: 'description',
+          message: 'Recording description:',
+          default: ''
+        }
+      ]);
+
+      const name = options.name || answers.name;
+      const description = answers.description;
+
+      const recording = workflowTemplateManager.startRecording(name, description);
+      console.log(`🔴 Started recording workflow: "${recording.name}"`);
+      console.log('💡 Perform your workflow actions, then stop with `gitswitch workflow record --stop`');
+    } catch (error: any) {
+      console.error('❌ Error:', error.message);
+      process.exit(1);
+    }
   });
 
 // Advanced Automation (Phase 4)
 autoCmd
   .command('template')
-  .description('Automation rule templates [COMING SOON]')
+  .description('Automation rule templates')
   .addCommand(
     new Command('list')
       .description('List rule templates')
-      .action(async () => {
-        console.log('🚧 COMING SOON: Rule Template Library');
-        console.log('📅 Expected: Q4 2024');
-        console.log('✨ Features: Browse and apply community rule templates');
-        console.log('💡 For now, create rules manually with `gitswitch auto rule create`');
+      .option('--category <category>', 'Filter by category')
+      .action(async (options) => {
+        try {
+          const templates = automationTemplateManager.getTemplates(options.category);
+
+          if (templates.length === 0) {
+            console.log('📝 No automation templates found.');
+            return;
+          }
+
+          console.log(`\n📋 Automation Templates (${templates.length}):\n`);
+          templates.forEach(template => {
+            console.log(`  ${template.name}`);
+            console.log(`    ID: ${template.id}`);
+            console.log(`    Category: ${template.category}`);
+            console.log(`    Difficulty: ${template.difficulty}`);
+            console.log(`    Description: ${template.description}`);
+            console.log(`    Usage count: ${template.usageCount}`);
+            console.log(`    Tags: ${template.tags.join(', ')}`);
+            console.log('');
+          });
+        } catch (error: any) {
+          console.error('❌ Error:', error.message);
+          process.exit(1);
+        }
       })
   )
   .addCommand(
     new Command('apply')
       .description('Apply rule template')
-      .action(async () => {
-        console.log('🚧 COMING SOON: Template Application');
-        console.log('📅 Expected: Q4 2024');
-        console.log('✨ Features: One-click rule template application');
-        console.log('💡 For now, configure rules manually');
+      .argument('[template-id]', 'Template ID')
+      .action(async (templateId) => {
+        try {
+          const templates = automationTemplateManager.getTemplates();
+
+          if (templates.length === 0) {
+            console.log('❌ No templates available.');
+            return;
+          }
+
+          let selectedTemplateId = templateId;
+
+          if (!selectedTemplateId) {
+            const { template } = await inquirer.prompt([
+              {
+                type: 'list',
+                name: 'template',
+                message: 'Select a template to apply:',
+                choices: templates.map(t => ({
+                  name: `${t.name} (${t.difficulty}) - ${t.description}`,
+                  value: t.id
+                }))
+              }
+            ]);
+            selectedTemplateId = template;
+          }
+
+          const rule = await automationTemplateManager.applyTemplate(selectedTemplateId);
+
+          if (rule) {
+            console.log(`✅ Automation template applied successfully!`);
+            console.log(`   Rule ID: ${rule.id}`);
+            console.log(`   Rule name: ${rule.name}`);
+          } else {
+            console.error('❌ Failed to apply template');
+            process.exit(1);
+          }
+        } catch (error: any) {
+          console.error('❌ Error:', error.message);
+          process.exit(1);
+        }
+      })
+  )
+  .addCommand(
+    new Command('search')
+      .description('Search rule templates')
+      .argument('<query>', 'Search query')
+      .action(async (query) => {
+        try {
+          const templates = automationTemplateManager.searchTemplates(query);
+
+          if (templates.length === 0) {
+            console.log(`📝 No templates found for: "${query}"`);
+            return;
+          }
+
+          console.log(`\n🔍 Found ${templates.length} template(s) for "${query}":\n`);
+          templates.forEach(template => {
+            console.log(`  ${template.name}`);
+            console.log(`    Description: ${template.description}`);
+            console.log(`    Category: ${template.category}`);
+            console.log('');
+          });
+        } catch (error: any) {
+          console.error('❌ Error:', error.message);
+          process.exit(1);
+        }
       })
   );
 
 autoCmd
   .command('quickstart')
-  .description('Quick setup wizard [COMING SOON]')
+  .description('Quick setup wizard')
   .action(async () => {
-    console.log('🚧 COMING SOON: Automation Quickstart Wizard');
-    console.log('📅 Expected: Q4 2024');
-    console.log('✨ Features: Guided setup for common automation scenarios');
-    console.log('💡 For now, use `gitswitch project auto-setup`');
+    try {
+      const scenarios = automationTemplateManager.getQuickstartScenarios();
+
+      const { scenario } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'scenario',
+          message: 'Choose a quickstart scenario:',
+          choices: scenarios.map(s => ({
+            name: `${s.icon} ${s.name} (${s.estimatedTime} min, ${s.difficulty})`,
+            value: s.id,
+            short: s.name
+          }))
+        }
+      ]);
+
+      const selectedScenario = scenarios.find(s => s.id === scenario);
+      if (!selectedScenario) {
+        console.error('❌ Scenario not found');
+        return;
+      }
+
+      console.log(`\n${selectedScenario.icon} ${selectedScenario.name}`);
+      console.log(`${selectedScenario.description}\n`);
+      console.log(`Estimated time: ${selectedScenario.estimatedTime} minutes`);
+      console.log(`Difficulty: ${selectedScenario.difficulty}\n`);
+
+      const { confirm } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirm',
+          message: 'Start this quickstart?',
+          default: true
+        }
+      ]);
+
+      if (!confirm) {
+        console.log('Cancelled.');
+        return;
+      }
+
+      // Execute quickstart
+      const responses = {};
+      const success = await automationTemplateManager.executeQuickstart(scenario, responses);
+
+      if (success) {
+        console.log('\n✅ Quickstart completed successfully!');
+        console.log('💡 Your automation rules have been configured.');
+      } else {
+        console.error('\n❌ Quickstart failed');
+        process.exit(1);
+      }
+    } catch (error: any) {
+      console.error('❌ Error:', error.message);
+      process.exit(1);
+    }
   });
 
 // Parse CLI arguments
