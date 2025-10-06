@@ -48,6 +48,11 @@ export class GitCommands extends BaseCommand implements ICommand {
           // Get current identity
           const currentConfig = await this.gitManager.getCurrentConfig(projectPath);
           
+          if (!currentConfig) {
+            console.log('⚠️  No git identity configured');
+            return;
+          }
+
           // Determine reset mode
           let mode: 'soft' | 'mixed' | 'hard' = 'mixed';
           if (options.soft) mode = 'soft';
@@ -74,7 +79,9 @@ export class GitCommands extends BaseCommand implements ICommand {
           const result = await this.advancedGitManager.performGitReset(projectPath, commit, mode);
           
           // Restore identity if it changed
-          if (currentConfig) await this.advancedGitManager.preserveIdentity(projectPath, currentConfig);
+          if (currentConfig) {
+            await this.advancedGitManager.preserveIdentity(projectPath, currentConfig);
+          }
 
           console.log(`✅ Reset to ${commit} (${mode}) completed`);
           console.log(`📧 Identity preserved: ${currentConfig.name} <${currentConfig.email}>`);
@@ -103,6 +110,11 @@ export class GitCommands extends BaseCommand implements ICommand {
           // Get current identity
           const currentConfig = await this.gitManager.getCurrentConfig(projectPath);
 
+          if (!currentConfig) {
+            console.log('⚠️  No git identity configured');
+            return;
+          }
+
           console.log(`🔄 Reverting ${commits.length} commit(s)...`);
 
           for (const commit of commits) {
@@ -113,7 +125,9 @@ export class GitCommands extends BaseCommand implements ICommand {
             );
 
             // Ensure identity is preserved
-            if (currentConfig) await this.advancedGitManager.preserveIdentity(projectPath, currentConfig);
+            if (currentConfig) {
+              await this.advancedGitManager.preserveIdentity(projectPath, currentConfig);
+            }
 
             console.log(`✅ Reverted ${commit.substring(0, 7)}`);
             
@@ -162,6 +176,11 @@ export class GitCommands extends BaseCommand implements ICommand {
           // Get current identity
           const currentConfig = await this.gitManager.getCurrentConfig(projectPath);
 
+          if (!currentConfig) {
+            console.log('⚠️  No git identity configured');
+            return;
+          }
+
           console.log(`🍒 Cherry-picking ${commits.length} commit(s)...`);
 
           for (const commit of commits) {
@@ -172,7 +191,9 @@ export class GitCommands extends BaseCommand implements ICommand {
             );
 
             // Ensure identity is preserved
-            if (currentConfig) await this.advancedGitManager.preserveIdentity(projectPath, currentConfig);
+            if (currentConfig) {
+              await this.advancedGitManager.preserveIdentity(projectPath, currentConfig);
+            }
 
             console.log(`✅ Cherry-picked ${commit.substring(0, 7)}`);
 
@@ -210,6 +231,11 @@ export class GitCommands extends BaseCommand implements ICommand {
           // Get current identity
           const currentConfig = await this.gitManager.getCurrentConfig(projectPath);
 
+          if (!currentConfig) {
+            console.log('⚠️  No git identity configured');
+            return;
+          }
+
           // Get commit message
           let message = options.message;
           if (!message) {
@@ -233,7 +259,9 @@ export class GitCommands extends BaseCommand implements ICommand {
           );
 
           // Ensure identity is preserved
-          if (currentConfig) await this.advancedGitManager.preserveIdentity(projectPath, currentConfig);
+          if (currentConfig) {
+            await this.advancedGitManager.preserveIdentity(projectPath, currentConfig);
+          }
 
           console.log(`✅ Squashed ${count} commits into 1`);
           console.log(`📧 Identity preserved: ${currentConfig.name} <${currentConfig.email}>`);

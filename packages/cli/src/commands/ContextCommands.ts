@@ -157,16 +157,18 @@ export class ContextCommands extends BaseCommand implements ICommand {
           if (isGitRepo) {
             try {
               const currentConfig = await this.gitManager.getCurrentConfig(targetPath);
-              console.log(`\n📧 Current Identity:`);
-              console.log(`   ${currentConfig.name} <${currentConfig.email}>`);
+              if (currentConfig) {
+                console.log(`\n📧 Current Identity:`);
+                console.log(`   ${currentConfig.name} <${currentConfig.email}>`);
 
-              if (suggestions.length > 0 && suggestions[0].account.email !== currentConfig.email) {
-                console.log(`\n⚠️  Identity Mismatch Detected!`);
-                console.log(`   Expected: ${suggestions[0].account.email}`);
-                console.log(`   Current:  ${currentConfig.email}`);
-                console.log(`\n   Run: gitswitch context switch`);
-              } else {
-                console.log(`\n✅ Identity matches context`);
+                if (suggestions.length > 0 && suggestions[0].account.email !== currentConfig.email) {
+                  console.log(`\n⚠️  Identity Mismatch Detected!`);
+                  console.log(`   Expected: ${suggestions[0].account.email}`);
+                  console.log(`   Current:  ${currentConfig.email}`);
+                  console.log(`\n   Run: gitswitch context switch`);
+                } else {
+                  console.log(`\n✅ Identity matches context`);
+                }
               }
             } catch (e) {
               // No current config
@@ -194,6 +196,11 @@ export class ContextCommands extends BaseCommand implements ICommand {
 
           // Get suggestions
           const remoteUrl = await this.gitManager.getRemoteUrl(targetPath);
+          if (!remoteUrl) {
+            console.log('⚠️  No remote URL found for this repository');
+            return;
+          }
+
           const suggestions = await this.smartDetector.suggestAccountForUrl(remoteUrl);
 
           if (suggestions.length === 0) {
@@ -223,8 +230,7 @@ export class ContextCommands extends BaseCommand implements ICommand {
           if (shouldSwitch) {
             await this.gitManager.setConfig(targetPath, {
               name: topSuggestion.account.name,
-              email: topSuggestion.account.email,
-              signingKey: topSuggestion.account.signingKey
+              email: topSuggestion.account.email
             });
 
             console.log(`✅ Identity switched successfully`);
@@ -412,8 +418,24 @@ export class ContextCommands extends BaseCommand implements ICommand {
           // Get current identity
           const currentConfig = await this.gitManager.getCurrentConfig(targetPath);
           
+          if (!currentConfig) {
+            console.log(`\n⚠️  No git identity configured`);
+            if (options.strict) {
+              process.exit(1);
+            }
+            return;
+          }
+
           // Get expected identity
           const remoteUrl = await this.gitManager.getRemoteUrl(targetPath);
+          if (!remoteUrl) {
+            console.log(`\n⚠️  No remote URL found for validation`);
+            if (options.strict) {
+              process.exit(1);
+            }
+            return;
+          }
+
           const suggestions = await this.smartDetector.suggestAccountForUrl(remoteUrl);
 
           console.log(`\n📧 Current Identity:`);

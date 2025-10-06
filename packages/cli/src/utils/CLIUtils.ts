@@ -50,7 +50,7 @@ export class CLIUtils {
   /**
    * Create a separator for inquirer choices
    */
-  static createSeparator(text?: string): inquirer.Separator {
+  static createSeparator(text?: string): any {
     return new inquirer.Separator(text || '────────────────────────────────────────');
   }
 
