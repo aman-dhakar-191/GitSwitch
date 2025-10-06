@@ -65,3 +65,4 @@ packages/desktop/dist/main.js
 packages/desktop/dist/renderer.js
 packages/desktop/dist/renderer.js.LICENSE.txt
 packages/types/dist/index.d.ts
+tests/dist/
