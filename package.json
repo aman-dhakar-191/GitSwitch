@@ -21,7 +21,6 @@
     "build:types": "cd packages/types && npm run build",
     "build:core": "cd packages/core && npm run build",
     "build:cli": "cd packages/cli && npm run build",
-
     "build:global": "npm run build && cd packages/gitswitch && npm run build",
     "package": "npm run build:global",
     "test": "npm run test --workspaces",
@@ -36,7 +35,6 @@
     "uninstall-global": "npm uninstall -g gitswitch",
     "verify": "node verify-packages.js",
     "release": "node release.js",
-
     "gulp": "gulp",
     "gulp:build": "gulp build",
     "gulp:build:minified": "gulp build:minified",
@@ -49,7 +47,7 @@
     "gulp:help": "gulp help"
   },
   "devDependencies": {
-    "@types/jest": "^29.0.0",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.0.0",
     "archiver": "^7.0.1",
     "del": "^8.0.1",
@@ -61,7 +59,7 @@
     "gulp-terser": "^2.1.0",
     "gulp-typescript": "^6.0.0-alpha.1",
     "jest": "^29.0.0",
-    "ts-jest": "^29.0.0",
+    "ts-jest": "^29.4.4",
     "typescript": "^5.0.0"
   },
   "engines": {
@@ -70,6 +68,5 @@
   "funding": {
     "type": "github",
     "url": "https://github.com/sponsors/aman-dhakar-191"
-  },
-  "dependencies": {}
+  }
 }
