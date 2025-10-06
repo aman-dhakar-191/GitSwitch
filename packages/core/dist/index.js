@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.OAuthManager = exports.BulkImportManager = exports.WorkflowAutomationManager = exports.AdvancedGitManager = exports.PluginManager = exports.ConfigSyncManager = exports.SecurityManager = exports.TeamManager = exports.GitHookManager = exports.ProjectScanner = exports.SmartDetector = exports.ProjectManager = exports.StorageManager = exports.GitManager = void 0;
+exports.HistoryRewriteManager = exports.AutomationTemplateManager = exports.WorkflowTemplateManager = exports.OAuthManager = exports.BulkImportManager = exports.WorkflowAutomationManager = exports.AdvancedGitManager = exports.PluginManager = exports.ConfigSyncManager = exports.SecurityManager = exports.TeamManager = exports.GitHookManager = exports.ProjectScanner = exports.SmartDetector = exports.ProjectManager = exports.StorageManager = exports.GitManager = void 0;
 const GitManager_1 = require("./GitManager");
 Object.defineProperty(exports, "GitManager", { enumerable: true, get: function () { return GitManager_1.GitManager; } });
 const StorageManager_1 = require("./StorageManager");
@@ -29,6 +29,12 @@ const BulkImportManager_1 = require("./BulkImportManager");
 Object.defineProperty(exports, "BulkImportManager", { enumerable: true, get: function () { return BulkImportManager_1.BulkImportManager; } });
 const OAuthManager_1 = require("./OAuthManager");
 Object.defineProperty(exports, "OAuthManager", { enumerable: true, get: function () { return OAuthManager_1.OAuthManager; } });
+const WorkflowTemplateManager_1 = require("./WorkflowTemplateManager");
+Object.defineProperty(exports, "WorkflowTemplateManager", { enumerable: true, get: function () { return WorkflowTemplateManager_1.WorkflowTemplateManager; } });
+const AutomationTemplateManager_1 = require("./AutomationTemplateManager");
+Object.defineProperty(exports, "AutomationTemplateManager", { enumerable: true, get: function () { return AutomationTemplateManager_1.AutomationTemplateManager; } });
+const HistoryRewriteManager_1 = require("./HistoryRewriteManager");
+Object.defineProperty(exports, "HistoryRewriteManager", { enumerable: true, get: function () { return HistoryRewriteManager_1.HistoryRewriteManager; } });
 exports.default = {
     GitManager: GitManager_1.GitManager,
     StorageManager: StorageManager_1.StorageManager,
@@ -43,5 +49,8 @@ exports.default = {
     AdvancedGitManager: AdvancedGitManager_1.AdvancedGitManager,
     WorkflowAutomationManager: WorkflowAutomationManager_1.WorkflowAutomationManager,
     BulkImportManager: BulkImportManager_1.BulkImportManager,
-    OAuthManager: OAuthManager_1.OAuthManager
+    OAuthManager: OAuthManager_1.OAuthManager,
+    WorkflowTemplateManager: WorkflowTemplateManager_1.WorkflowTemplateManager,
+    AutomationTemplateManager: AutomationTemplateManager_1.AutomationTemplateManager,
+    HistoryRewriteManager: HistoryRewriteManager_1.HistoryRewriteManager
 };
