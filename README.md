@@ -299,6 +299,8 @@ gitswitch context detect
 - 🤖 **Automation Templates**: Pre-built automation rules and guided quickstart wizards
 - 🔧 **History Rewriting**: Safe git history rewriting with identity corrections and backup management
 
+📖 **[Phase 4 Usage Guide](docs/phase-4-usage-guide.md)** - Comprehensive guide for using the new features
+
 ### Stage 2: Enhanced Features (Weeks 5-8) ✅ COMPLETED
 All Stage 2 features have been implemented and are available in the current release.
 
