@@ -4,6 +4,12 @@ import { DotCommand } from './DotCommand';
 import { AccountCommands } from './AccountCommands';
 import { ProjectCommands } from './ProjectCommands';
 import { HookCommands } from './HookCommands';
+import { GitCommands } from './GitCommands';
+import { RepoCommands } from './RepoCommands';
+import { IntegrationCommands } from './IntegrationCommands';
+import { ContextCommands } from './ContextCommands';
+import { PatternCommands } from './PatternCommands';
+import { PerfCommands } from './PerfCommands';
 
 // Import managers from core
 import {
@@ -104,6 +110,48 @@ export class CommandRegistry {
         this.storageManager,
         this.projectManager,
         this.gitHookManager
+      ),
+
+      // Phase 3 Commands
+      new GitCommands(
+        this.gitManager,
+        this.storageManager,
+        this.projectManager,
+        this.advancedGitManager
+      ),
+
+      new RepoCommands(
+        this.gitManager,
+        this.storageManager,
+        this.projectManager,
+        this.smartDetector
+      ),
+
+      new IntegrationCommands(
+        this.gitManager,
+        this.storageManager,
+        this.projectManager
+      ),
+
+      new ContextCommands(
+        this.gitManager,
+        this.storageManager,
+        this.projectManager,
+        this.smartDetector,
+        this.workflowAutomationManager
+      ),
+
+      new PatternCommands(
+        this.gitManager,
+        this.storageManager,
+        this.projectManager,
+        this.smartDetector
+      ),
+
+      new PerfCommands(
+        this.gitManager,
+        this.storageManager,
+        this.projectManager
       )
     ];
   }

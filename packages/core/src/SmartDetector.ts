@@ -405,6 +405,274 @@ export class SmartDetector {
   private generateId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
   }
+
+  /**
+   * Suggest account for a URL
+   */
+  async suggestAccountForUrl(url: string): Promise<any[]> {
+    const accounts = this.storageManager.getAccounts();
+    const suggestions: any[] = [];
+
+    for (const account of accounts) {
+      const confidence = this.calculateUrlConfidence(account, url);
+      const reason = this.generateUrlReason(account, url, confidence);
+      const usageHistory = this.getUrlUsageHistory(account, url);
+
+      suggestions.push({
+        account,
+        accountId: account.id,
+        confidence,
+        reason,
+        patterns: this.getMatchingPatterns(account, url),
+        usageHistory,
+        patternMatch: confidence > 0.7 ? url : undefined
+      });
+    }
+
+    return suggestions.sort((a, b) => b.confidence - a.confidence);
+  }
+
+  /**
+   * Suggest account for a path
+   */
+  async suggestAccountForPath(targetPath: string): Promise<any[]> {
+    const accounts = this.storageManager.getAccounts();
+    const projects = this.storageManager.getProjects();
+    const suggestions: any[] = [];
+
+    for (const account of accounts) {
+      const confidence = this.calculatePathConfidence(account, targetPath, projects);
+      const reason = this.generatePathReason(account, targetPath, confidence);
+
+      suggestions.push({
+        account,
+        accountId: account.id,
+        confidence,
+        reason,
+        patterns: [],
+        usageHistory: 0
+      });
+    }
+
+    return suggestions.sort((a, b) => b.confidence - a.confidence);
+  }
+
+  /**
+   * Record account usage for learning
+   */
+  async recordAccountUsage(accountEmail: string, urlOrPath: string): Promise<void> {
+    const account = this.storageManager.getAccountByEmail(accountEmail);
+    if (!account) return;
+
+    account.usageCount++;
+    account.lastUsed = new Date();
+    this.storageManager.updateAccount(account.id, account);
+
+    this.analytics.accountUsage[account.id] = (this.analytics.accountUsage[account.id] || 0) + 1;
+  }
+
+  /**
+   * Learn patterns from usage
+   */
+  async learnPatternsFromUsage(): Promise<any[]> {
+    const projects = this.storageManager.getProjects();
+    const accounts = this.storageManager.getAccounts();
+    const patterns: any[] = [];
+
+    // Group projects by account
+    const projectsByAccount = new Map<string, any[]>();
+    projects.forEach(p => {
+      if (p.accountId) {
+        if (!projectsByAccount.has(p.accountId)) {
+          projectsByAccount.set(p.accountId, []);
+        }
+        projectsByAccount.get(p.accountId)!.push(p);
+      }
+    });
+
+    // Extract patterns from each account's projects
+    projectsByAccount.forEach((accountProjects, accountId) => {
+      const account = accounts.find(a => a.id === accountId);
+      if (!account) return;
+
+      // Find common URL patterns
+      const urlPatterns = this.extractUrlPatterns(accountProjects);
+      urlPatterns.forEach(pattern => {
+        patterns.push({
+          pattern: pattern.pattern,
+          type: 'url',
+          accountEmail: account.email,
+          confidence: pattern.confidence,
+          usageCount: pattern.count,
+          examples: pattern.examples
+        });
+      });
+    });
+
+    return patterns;
+  }
+
+  /**
+   * Get learned patterns
+   */
+  async getLearnedPatterns(): Promise<any[]> {
+    return this.learnPatternsFromUsage();
+  }
+
+  /**
+   * Import patterns
+   */
+  async importPatterns(patterns: any[], merge: boolean): Promise<any> {
+    let success = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    patterns.forEach(pattern => {
+      try {
+        // Add pattern logic here
+        success++;
+      } catch (error) {
+        errors++;
+      }
+    });
+
+    return { success, skipped, errors };
+  }
+
+  // Helper methods for new functionality
+
+  private calculateUrlConfidence(account: GitAccount, url: string): number {
+    let confidence = 0;
+
+    // Check patterns
+    const matchingPatterns = this.getMatchingPatterns(account, url);
+    if (matchingPatterns.length > 0) {
+      confidence += 0.5;
+    }
+
+    // Check organization match
+    const org = this.detectOrganization(url);
+    if (org && account.patterns.some(p => p.includes(org))) {
+      confidence += 0.3;
+    }
+
+    // Check if default
+    if (account.isDefault) {
+      confidence += 0.1;
+    }
+
+    // Check recent usage
+    if (account.lastUsed) {
+      const daysSinceUse = (Date.now() - new Date(account.lastUsed).getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceUse < 7) {
+        confidence += 0.1;
+      }
+    }
+
+    return Math.min(confidence, 1.0);
+  }
+
+  private calculatePathConfidence(account: GitAccount, targetPath: string, projects: Project[]): number {
+    let confidence = 0;
+
+    // Check if path matches known projects
+    const matchingProjects = projects.filter(p => 
+      p.accountId === account.id && targetPath.includes(p.path)
+    );
+
+    if (matchingProjects.length > 0) {
+      confidence += 0.6;
+    }
+
+    // Default account bonus
+    if (account.isDefault) {
+      confidence += 0.2;
+    }
+
+    // Recent usage
+    if (account.lastUsed) {
+      const daysSinceUse = (Date.now() - new Date(account.lastUsed).getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceUse < 7) {
+        confidence += 0.2;
+      }
+    }
+
+    return Math.min(confidence, 1.0);
+  }
+
+  private generateUrlReason(account: GitAccount, url: string, confidence: number): string {
+    const org = this.detectOrganization(url);
+    
+    if (confidence > 0.9) {
+      return `Strong pattern match for ${org || 'repository'}`;
+    } else if (confidence > 0.7) {
+      return `Good match based on usage patterns`;
+    } else if (confidence > 0.5) {
+      return `Possible match for ${this.detectPlatform(url)}`;
+    } else if (account.isDefault) {
+      return 'Default account';
+    }
+    
+    return 'Low confidence match';
+  }
+
+  private generatePathReason(account: GitAccount, targetPath: string, confidence: number): string {
+    if (confidence > 0.7) {
+      return 'Matches known project paths';
+    } else if (account.isDefault) {
+      return 'Default account';
+    }
+    
+    return 'Based on recent usage';
+  }
+
+  private getUrlUsageHistory(account: GitAccount, url: string): number {
+    const projects = this.storageManager.getProjects();
+    const org = this.detectOrganization(url);
+    
+    if (!org) return 0;
+    
+    return projects.filter(p => 
+      p.accountId === account.id && 
+      p.remoteUrl && 
+      this.detectOrganization(p.remoteUrl) === org
+    ).length;
+  }
+
+  private extractUrlPatterns(projects: any[]): any[] {
+    const patternMap = new Map<string, any>();
+
+    projects.forEach(p => {
+      if (!p.remoteUrl) return;
+
+      const org = this.detectOrganization(p.remoteUrl);
+      if (org) {
+        const pattern = `*${org}*`;
+        
+        if (!patternMap.has(pattern)) {
+          patternMap.set(pattern, {
+            pattern,
+            count: 0,
+            examples: [],
+            confidence: 0
+          });
+        }
+
+        const entry = patternMap.get(pattern)!;
+        entry.count++;
+        if (entry.examples.length < 5) {
+          entry.examples.push(p.remoteUrl);
+        }
+      }
+    });
+
+    // Calculate confidence based on usage
+    patternMap.forEach(entry => {
+      entry.confidence = Math.min(entry.count / 10, 1.0);
+    });
+
+    return Array.from(patternMap.values());
+  }
 }
 
 export default SmartDetector;

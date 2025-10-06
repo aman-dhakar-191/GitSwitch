@@ -50,7 +50,7 @@ export class CLIUtils {
   /**
    * Create a separator for inquirer choices
    */
-  static createSeparator(text?: string): inquirer.Separator {
+  static createSeparator(text?: string): any {
     return new inquirer.Separator(text || '────────────────────────────────────────');
   }
 
@@ -183,6 +183,25 @@ export class CLIUtils {
     if (currentAlternative) {
       console.log(`💡 For now, use: ${currentAlternative}`);
     }
+  }
+
+  /**
+   * Display an error message
+   */
+  static showError(context: string, error: any): void {
+    console.error(`\n❌ ${context}`);
+    console.error(`   Error: ${error.message || error}`);
+    if (error.stack && process.env.DEBUG) {
+      console.error(`\n   Stack trace:`);
+      console.error(error.stack);
+    }
+  }
+
+  /**
+   * Display a success message
+   */
+  static showSuccess(message: string): void {
+    console.log(`\n✅ ${message}`);
   }
 
   /**
